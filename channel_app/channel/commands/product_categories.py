@@ -1,0 +1,1 @@
+#TODO implement channel product category integration
