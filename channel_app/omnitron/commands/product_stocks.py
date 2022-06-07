@@ -84,12 +84,9 @@ class GetUpdatedProductStocksFromExtraStockList(OmnitronCommandInterface):
         endpoint = self.endpoint(path=self.path,
                                  channel_id=self.integration.channel_id)
         stocks = endpoint.list(
-            params={"stock_list": self.stock_list_id}
+            params={"stock_list": self.stock_list_id,
+                    "limit": self.BATCH_SIZE}
         )
-        for stock_batch in endpoint.iterator:
-            stocks.extend(stock_batch)
-            if len(stocks) >= self.BATCH_SIZE:
-                break
         stocks = stocks[:self.BATCH_SIZE]
         objects_data = self.create_batch_objects(data=stocks,
                                                  content_type=self.content_type)
@@ -218,9 +215,9 @@ class ProcessStockBatchRequests(OmnitronCommandInterface, ProcessBatchRequests):
 
         channel_items_by_product_id = {}
         for product_id, product in model_items_by_content_product.items():
+            sku = self.get_barcode(obj=product)
             for channel_item in channel_response:
                 # TODO: comment
-                sku = self.get_barcode(obj=product)
                 if channel_item.sku != sku:
                     continue
                 remote_item = channel_item

@@ -1,21 +1,18 @@
 import requests
 
-from channel_app.channel.commands.orders.orders import GetOrders, CheckOrders, \
-    SendUpdatedOrders, GetCancelledOrders
-from channel_app.channel.commands.product_prices import (CheckPrices,
-                                                         SendInsertedPrices,
-                                                         SendUpdatedPrices)
-from channel_app.channel.commands.product_stocks import (SendUpdatedStocks,
-                                                         CheckStocks,
-                                                         SendInsertedStocks)
-from channel_app.channel.commands.products import (SendInsertedProducts,
-                                                   CheckProducts,
-                                                   CheckDeletedProducts,
-                                                   SendUpdatedProducts,
-                                                   SendDeletedProducts)
-from channel_app.channel.commands.setup import (GetCategoryTreeAndNodes,
-                                                GetCategoryAttributes,
-                                                GetChannelConfSchema)
+from channel_app.channel.commands.orders.orders import (
+    GetOrders, CheckOrders, SendUpdatedOrders, GetCancelledOrders)
+from channel_app.channel.commands.product_images import (
+    SendUpdatedImages, SendInsertedImages, CheckImages)
+from channel_app.channel.commands.product_prices import (
+    CheckPrices, SendInsertedPrices, SendUpdatedPrices)
+from channel_app.channel.commands.product_stocks import (
+    SendUpdatedStocks, CheckStocks, SendInsertedStocks)
+from channel_app.channel.commands.products import (
+    SendInsertedProducts, CheckProducts, CheckDeletedProducts,
+    SendUpdatedProducts, SendDeletedProducts)
+from channel_app.channel.commands.setup import (
+    GetCategoryTreeAndNodes, GetCategoryAttributes, GetChannelConfSchema)
 from channel_app.core.integration import BaseIntegration
 
 
@@ -37,8 +34,11 @@ class ChannelIntegration(BaseIntegration):
         "send_inserted_stocks": SendInsertedStocks,
         "send_updated_prices": SendUpdatedPrices,
         "send_inserted_prices": SendInsertedPrices,
+        "send_updated_images": SendUpdatedImages,
+        "send_inserted_images": SendInsertedImages,
         "check_stocks": CheckStocks,
         "check_prices": CheckPrices,
+        "check_images": CheckImages,
         "get_category_tree_and_nodes": GetCategoryTreeAndNodes,
         "get_channel_conf_schema": GetChannelConfSchema,
         "get_category_attributes": GetCategoryAttributes,

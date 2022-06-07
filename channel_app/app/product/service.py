@@ -15,7 +15,7 @@ class ProductService(object):
     batch_service = ClientBatchRequest
 
     def insert_products(self, add_mapped=True, add_stock=True, add_price=True,
-                        add_categories=True, is_sync=True,
+                        add_images=False, add_categories=True, is_sync=True,
                         is_success_log=True):
         with OmnitronIntegration(
                 content_type=ContentType.product.value) as omnitron_integration:
@@ -33,6 +33,10 @@ class ProductService(object):
             if add_price:
                 products = products and omnitron_integration.do_action(
                     key='get_product_prices', objects=products)
+
+            if add_images:
+                products = products and omnitron_integration.do_action(
+                    key='get_product_images', objects=products)
 
             if add_categories:
                 products = products and omnitron_integration.do_action(
@@ -74,11 +78,13 @@ class ProductService(object):
                     objects=response_data)
 
     def update_products(self, add_mapped=True, add_stock=True, add_price=True,
-                        add_categories=True, is_sync=True, is_success_log=True):
+                        add_images=False, add_categories=True, is_sync=True,
+                        is_success_log=True):
         with OmnitronIntegration(
                 content_type=ContentType.product.value) as omnitron_integration:
             products = omnitron_integration.do_action(
                 key='get_updated_products')
+
             if add_mapped:
                 products = products and omnitron_integration.do_action(
                     key='get_mapped_products', objects=products)
@@ -90,6 +96,10 @@ class ProductService(object):
             if add_price:
                 products = products and omnitron_integration.do_action(
                     key='get_product_prices', objects=products)
+
+            if add_images:
+                products = products and omnitron_integration.do_action(
+                    key='get_product_images', objects=products)
 
             if add_categories:
                 products = products and omnitron_integration.do_action(

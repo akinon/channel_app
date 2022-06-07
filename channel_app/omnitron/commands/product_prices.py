@@ -106,12 +106,10 @@ class GetInsertedProductPricesFromExtraPriceList(OmnitronCommandInterface):
         endpoint = self.endpoint(path=self.path,
                                  channel_id=self.integration.channel_id)
         prices = endpoint.list(
-            params={"price_list": self.price_list_id}
+            params={"price_list": self.price_list_id,
+                    "limit": self.BATCH_SIZE}
         )
-        for price_batch in endpoint.iterator:
-            prices.extend(price_batch)
-            if len(prices) >= self.BATCH_SIZE:
-                break
+
         prices = prices[:self.BATCH_SIZE]
         objects_data = self.create_batch_objects(data=prices,
                                                  content_type=self.content_type)
@@ -181,9 +179,9 @@ class ProcessPriceBatchRequests(OmnitronCommandInterface, ProcessBatchRequests):
 
         channel_items_by_product_id = {}
         for product_id, product in model_items_by_content_product.items():
+            sku = self.get_barcode(obj=product)
             for channel_item in channel_response:
                 # TODO: comment
-                sku = self.get_barcode(obj=product)
                 if channel_item.sku != sku:
                     continue
                 remote_item = channel_item

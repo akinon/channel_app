@@ -522,9 +522,9 @@ class ProcessProductBatchRequests(OmnitronCommandInterface,
                                                   integration_actions):
         channel_items_by_product_id = {}
         for product_id, product in model_items_by_content["product"].items():
+            sku = self.get_barcode(obj=product)
             for channel_item in channel_response:
                 # TODO: comment
-                sku = self.get_barcode(obj=product)
                 if channel_item.sku != sku:
                     continue
                 remote_item = channel_item

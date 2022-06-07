@@ -135,7 +135,7 @@ class OmnitronOrderDto:
     client_type: Optional[str] = ""
     language_code: Optional[str] = ""
     notes: Optional[str] = ""
-    delivery_range: Optional[str] = ""
+    delivery_range: Optional[str] = None
     shipping_option_slug: Optional[str] = ""
     status: Optional[str] = ""
 
@@ -175,6 +175,7 @@ class CancelOrderDto:
     cancel_items: List[str]  # order_item_remote_id list
     reasons: dict  # order_item_remote_id : reason code
     is_cargo_refund: Optional[bool] = False  # default False
+    forced_refund_amount: Optional[bool] = None  # default False
     refund_invoice_number: Optional[str] = None
 
 

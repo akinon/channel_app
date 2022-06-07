@@ -97,10 +97,10 @@ class ProcessOrderBatchRequests(OmnitronCommandInterface, ProcessBatchRequests):
                                                   integration_actions):
         channel_items_by_order_id = {}
         for order_id, order in model_items_by_content["order"].items():
+            number = self.get_remote_order_number(
+                obj=order, integration_actions=integration_actions)
             for channel_item in channel_response:
                 # TODO: comment
-                number = self.get_remote_order_number(obj=order,
-                                                      integration_actions=integration_actions)
                 if channel_item.number != number:
                     continue
                 remote_item = channel_item
@@ -161,15 +161,17 @@ class CreateOrders(OmnitronCommandInterface):
                 "cargo_company": order.cargo_company,
                 "discount_amount": order.discount_amount or 0,
                 "net_shipping_amount": order.net_shipping_amount,
-                "tracking_number": order.tracking_number[:256],
-                "carrier_shipping_code": order.carrier_shipping_code[:256],
+                "tracking_number": (order.tracking_number and
+                                    order.tracking_number[:256]),
+                "carrier_shipping_code": (order.carrier_shipping_code and
+                                          order.carrier_shipping_code[:256]),
                 "remote_addr": order.remote_addr,
                 "has_gift_box": order.has_gift_box,
                 "gift_box_note": order.gift_box_note[:160],
                 "client_type": "default",
                 "language_code": order.language_code,
                 "notes": order.notes[:320],
-                "delivery_range": order.delivery_type,
+                "delivery_range": order.delivery_range,
                 "shipping_option_slug": order.shipping_option_slug[:128],
                 "date_placed": str(order.created_at)
             }
@@ -335,7 +337,8 @@ class CreateOrderCancel(OmnitronCommandInterface):
         data = {
             "cancel_items": order_item_pk_list,
             "order": order_pk,
-            "reasons": reasons
+            "reasons": reasons,
+            "forced_refund_amount": cancel_data.forced_refund_amount
         }
         return data
 
@@ -412,7 +415,7 @@ class CreateOrderCancel(OmnitronCommandInterface):
         return reasons_dict
 
     def send(self, validated_data) -> Order:
-        path = self.path.format(validated_data["order"])
+        path = self.path.format(pk=validated_data["order"])
         endpoint = self.endpoint(path=path,
                                  channel_id=self.integration.channel_id,
                                  raw=True)

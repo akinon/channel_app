@@ -20,7 +20,11 @@ from channel_app.omnitron.commands.orders.orders import (
     CreateOrderShippingInfo,
     GetOrders,
     ProcessOrderBatchRequests,
-    CreateOrderCancel, GetCancellationRequest)
+    CreateOrderCancel,
+    GetCancellationRequest)
+from channel_app.omnitron.commands.product_images import (
+    GetUpdatedProductImages, GetInsertedProductImages,
+    ProcessImageBatchRequests)
 from channel_app.omnitron.commands.product_prices import (
     GetUpdatedProductPrices, ProcessPriceBatchRequests,
     GetInsertedProductPrices, GetInsertedProductPricesFromExtraPriceList,
@@ -80,9 +84,12 @@ class OmnitronIntegration(BaseIntegration):
         "get_inserted_prices": GetInsertedProductPrices,
         "get_inserted_prices_from_extra_price_list": GetInsertedProductPricesFromExtraPriceList,
         "get_updated_prices_from_extra_price_list": GetUpdatedProductPricesFromExtraPriceList,
+        "get_updated_images": GetUpdatedProductImages,
+        "get_inserted_images": GetInsertedProductImages,
         "process_product_batch_requests": ProcessProductBatchRequests,
         "process_stock_batch_requests": ProcessStockBatchRequests,
         "process_price_batch_requests": ProcessPriceBatchRequests,
+        "process_image_batch_requests": ProcessImageBatchRequests,
         "process_order_batch_requests": ProcessOrderBatchRequests,
         "process_delete_product_batch_requests": ProcessDeletedProductBatchRequests,
         "get_or_create_customer": GetOrCreateCustomer,

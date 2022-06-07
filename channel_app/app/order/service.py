@@ -57,7 +57,7 @@ class OrderService(object):
         try:
             customer = omnitron_integration.do_action(
                 key='get_or_create_customer',
-                objects=order.customer)
+                objects=order.customer)[0]
         except Exception:
             return
 
@@ -116,10 +116,6 @@ class OrderService(object):
         except OrderException:
             return
 
-        omnitron_integration.do_action(
-            key='create_order_shipping_info',
-            objects=order
-        )
         return order
 
     def update_orders(self, is_sync=True, is_success_log=True):
