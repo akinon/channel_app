@@ -109,6 +109,11 @@ class GetOrCreateAddress(OmnitronCommandInterface):
             address = addresses[0]
         return [address]
 
+    def check_run(self,  is_ok, formatted_data):
+        if formatted_data:
+            return True
+        return False
+
     def get_location_objects(self, country_code, city_name, township_name=None,
                              district_name=None):
         """

@@ -124,7 +124,7 @@ class OmnitronOrderDto:
     extra_field: dict
     cargo_company: int
     created_at: datetime.datetime
-    delivery_type: Optional[str] = ""
+    delivery_type: Optional[str] = None
     discount_amount: Optional[Decimal] = "0.0"
     net_shipping_amount: Optional[Decimal] = "0.0"
     tracking_number: Optional[str] = None

@@ -19,6 +19,7 @@ from channel_app.core.utilities import split_list
 from channel_app.omnitron.batch_request import ClientBatchRequest
 from channel_app.omnitron.commands.batch_requests import ProcessBatchRequests
 from channel_app.omnitron.constants import (ContentType, BatchRequestStatus)
+from channel_app.omnitron.exceptions import OrderException
 
 
 class GetOrders(OmnitronCommandInterface):
@@ -186,8 +187,27 @@ class CreateOrders(OmnitronCommandInterface):
 
     def send(self, validated_data) -> object:
         order_obj = Order(**validated_data)
-        order = self.endpoint(channel_id=self.integration.channel_id).create(
-            item=order_obj)
+        order_endpoint = ChannelOrderEndpoint
+        try:
+            order_number = order_obj.order.get("number")
+            is_order_exists = order_endpoint(
+                channel_id=self.integration.channel_id
+            ).list(
+                params={
+                    "number": order_number,
+                    "channel_id": self.integration.channel_id
+                    }
+            )
+            if is_order_exists:
+                raise OrderException(params="Order Already Exist On Omnitron")
+
+        except OrderException:
+            return is_order_exists
+
+        order = self.endpoint(
+            channel_id=self.integration.channel_id
+        ).create(item=order_obj)
+
         self._update_batch_request(order)
         return order
 
@@ -222,7 +242,7 @@ class CreateOrders(OmnitronCommandInterface):
 
     @property
     def update_state(self, *args, **kwargs) -> BatchRequestStatus:
-        return BatchRequestStatus.done
+        return BatchRequestStatus.commit
 
     def prepare_order_items(self, order_items: List[OrderItemDto]):
         product_dict = self.get_products(order_items)
