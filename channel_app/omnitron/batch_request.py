@@ -28,6 +28,7 @@ class ClientBatchRequest(object):
         br.objects = batch_request.objects
         br.status = BatchRequestStatus.commit.value
         br.content_type = batch_request.content_type
+        batch_request.status = br.status
         return self.endpoint(channel_id=self.channel_id).update(id=batch_request.pk, item=br)
 
     def to_sent_to_remote(self, batch_request: BatchRequest) -> BatchRequest:
@@ -40,6 +41,7 @@ class ClientBatchRequest(object):
         br = BatchRequest(channel=self.channel_id)
         br.remote_batch_id = batch_request.remote_batch_id
         br.status = BatchRequestStatus.sent_to_remote.value
+        batch_request.status = br.status
         return self.endpoint(channel_id=self.channel_id).update(
             id=batch_request.pk, item=br)
 
@@ -52,6 +54,7 @@ class ClientBatchRequest(object):
         """
         br = BatchRequest(channel=self.channel_id)
         br.status = BatchRequestStatus.ongoing.value
+        batch_request.status = br.status
         return self.endpoint(channel_id=self.channel_id).update(
             id=batch_request.pk, item=br)
 
@@ -64,6 +67,7 @@ class ClientBatchRequest(object):
         br = BatchRequest(channel=self.channel_id)
         br.objects = batch_request.objects
         br.status = BatchRequestStatus.fail.value
+        batch_request.status = br.status
         return self.endpoint(channel_id=self.channel_id).update(
             id=batch_request.pk, item=br)
 
@@ -77,6 +81,7 @@ class ClientBatchRequest(object):
         br = BatchRequest(channel=self.channel_id)
         br.objects = batch_request.objects
         br.status = BatchRequestStatus.done.value
+        batch_request.status = br.status
         return self.endpoint(channel_id=self.channel_id).update(
             id=batch_request.pk, item=br)
 

@@ -45,9 +45,10 @@ class SetupService(object):
                         key='create_error_report',
                         objects=report)
 
+                category = category if category.attributes else None
                 omnitron_integration.do_action(
                     key='create_or_update_category_attributes',
-                    objects=category)
+                    objects=(category_ia, category))
 
     def update_channel_conf_schema(self):
         with OmnitronIntegration(
