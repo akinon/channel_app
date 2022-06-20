@@ -3,8 +3,8 @@ from typing import List
 from omnisdk.omnitron.models import ProductStock, BatchRequest
 
 from channel_app.core import settings
-from channel_app.core.settings import OmnitronIntegration, ChannelIntegration
 from channel_app.core.data import BatchRequestResponseDto, ErrorReportDto
+from channel_app.core.settings import OmnitronIntegration, ChannelIntegration
 from channel_app.omnitron.batch_request import ClientBatchRequest
 from channel_app.omnitron.constants import ContentType
 
@@ -13,7 +13,7 @@ class StockService(object):
     batch_service = ClientBatchRequest
 
     def update_product_stocks(self, is_sync=True, is_success_log=True,
-                              add_product_objects=False):
+                              add_product_objects=False, add_price=False):
         with OmnitronIntegration(
                 content_type=ContentType.product_stock.value) as omnitron_integration:
             product_stocks = omnitron_integration.do_action(
@@ -22,6 +22,12 @@ class StockService(object):
             if add_product_objects:
                 product_stocks = product_stocks and omnitron_integration.do_action(
                     key='get_product_objects', objects=product_stocks)
+
+            if add_price:
+                product_stocks = product_stocks and omnitron_integration.do_action(
+                    key='get_prices_from_product_stocks',
+                    objects=product_stocks,
+                    stock_list=omnitron_integration.catalog.price_list)
 
             if not product_stocks:
                 return
@@ -57,9 +63,9 @@ class StockService(object):
                     key='process_stock_batch_requests',
                     objects=response_data)
 
-
     def update_product_stocks_from_extra_stock_list(self, is_sync=True,
                                                     is_success_log=True,
+                                                    add_price=False,
                                                     add_product_objects=False):
         warehouse_mappings = self.get_warehouse_mappings()
         for stock_list_id, country_code in warehouse_mappings.items():
@@ -72,6 +78,12 @@ class StockService(object):
                 if add_product_objects:
                     product_stocks = product_stocks and omnitron_integration.do_action(
                         key='get_product_objects', objects=product_stocks)
+
+                if add_price:
+                    product_stocks = product_stocks and omnitron_integration.do_action(
+                        key='get_prices_from_product_stocks',
+                        objects=product_stocks,
+                        stock_list=omnitron_integration.catalog.price_list)
 
                 if not product_stocks:
                     return
@@ -109,6 +121,7 @@ class StockService(object):
 
     def insert_product_stocks_from_extra_stock_list(self, is_sync=True,
                                                     is_success_log=True,
+                                                    add_price=False,
                                                     add_product_objects=False):
         warehouse_mappings = self.get_warehouse_mappings()
         for stock_list_id, country_code in warehouse_mappings.items():
@@ -121,6 +134,12 @@ class StockService(object):
                 if add_product_objects:
                     product_stocks = product_stocks and omnitron_integration.do_action(
                         key='get_product_objects', objects=product_stocks)
+
+                if add_price:
+                    product_stocks = product_stocks and omnitron_integration.do_action(
+                        key='get_prices_from_product_stocks',
+                        objects=product_stocks,
+                        stock_list=omnitron_integration.catalog.price_list)
 
                 if not product_stocks:
                     return
@@ -157,7 +176,7 @@ class StockService(object):
                         objects=response_data)
 
     def insert_product_stocks(self, is_sync=True, is_success_log=True,
-                              add_product_objects=False):
+                              add_product_objects=False, add_price=False):
         with OmnitronIntegration(
                 content_type=ContentType.product_stock.value) as omnitron_integration:
             product_stocks = omnitron_integration.do_action(
@@ -166,6 +185,12 @@ class StockService(object):
             if add_product_objects:
                 product_stocks = product_stocks and omnitron_integration.do_action(
                     key='get_product_objects', objects=product_stocks)
+
+            if add_price:
+                product_stocks = product_stocks and omnitron_integration.do_action(
+                    key='get_prices_from_product_stocks',
+                    objects=product_stocks,
+                    stock_list=omnitron_integration.catalog.price_list)
 
             if not product_stocks:
                 return

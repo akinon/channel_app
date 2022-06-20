@@ -2,11 +2,12 @@ from typing import List
 
 from omnisdk.omnitron.endpoints import ChannelIntegrationActionEndpoint, \
     ChannelProductPriceEndpoint, ChannelBatchRequestEndpoint, \
-    ChannelExtraProductPriceEndpoint
+    ChannelExtraProductPriceEndpoint, ChannelExtraProductStockEndpoint
 from omnisdk.omnitron.models import ProductPrice
 
 from channel_app.core.commands import OmnitronCommandInterface
 from channel_app.core.data import BatchRequestResponseDto
+from channel_app.core.utilities import split_list
 from channel_app.omnitron.commands.batch_requests import ProcessBatchRequests
 from channel_app.omnitron.constants import (ContentType, BatchRequestStatus,
                                             IntegrationActionStatus,
@@ -138,6 +139,82 @@ class GetInsertedProductPricesFromExtraPriceList(OmnitronCommandInterface):
 class GetUpdatedProductPricesFromExtraPriceList(
     GetInsertedProductPricesFromExtraPriceList):
     path = "updates"
+
+
+class GetProductStocksFromProductPrices(OmnitronCommandInterface):
+    endpoint = ChannelExtraProductStockEndpoint
+    content_type = ContentType.product_stock.value
+    CHUNK_SIZE = 50
+
+    def get_data(self) -> List[ProductPrice]:
+        product_prices = self.objects
+        self.get_product_stock(product_prices)
+        return product_prices
+
+    def normalize_response(self, data, response) -> List[object]:
+        object_list = []
+        failed_prices = [failed_product_prices[0] for failed_product_prices in
+                         self.failed_object_list]
+        product_price_object_list = self.create_batch_objects(
+            data=failed_prices,
+            content_type=ContentType.product_price.value)
+        object_list.extend(product_price_object_list)
+
+        self.create_integration_actions(data, object_list)
+        self.update_batch_request(object_list)
+        return data
+
+    def create_integration_actions(self, data, object_list):
+        commit_product_stocks = [product_prices.productstock for product_prices
+                                 in data
+                                 if not getattr(product_prices,
+                                                "failed_reason_type",
+                                                None)]
+        product_stock_object_list = self.create_batch_objects(
+            data=commit_product_stocks,
+            content_type=ContentType.product_stock.value)
+        object_list.extend(product_stock_object_list)
+
+    def get_product_stock(self, product_prices: List[ProductPrice]) -> List[
+        ProductPrice]:
+        if not product_prices:
+            empty_list: List[ProductPrice] = []
+            return empty_list
+
+        product_ids = [str(pp.product) for pp in product_prices if
+                       not getattr(pp, "failed_reason_type", None)]
+
+        endpoint = self.endpoint(channel_id=self.integration.channel_id)
+        stocks = []
+        for chunk in split_list(product_ids, self.CHUNK_SIZE):
+            stock_batch = self.get_stocks(chunk, endpoint)
+            if not stock_batch:
+                break
+            stocks.extend(stock_batch)
+
+        product_stocks = {s.product: s for s in stocks}
+
+        for index, product_price in enumerate(product_prices):
+            if getattr(product_price, "failed_reason_type", None):
+                continue
+            try:
+                product_price.productstock = product_stocks[
+                    product_price.product]
+            except KeyError:
+                product_price.failed_reason_type = FailedReasonType.channel_app.value
+                self.failed_object_list.append(
+                    (product_price, ContentType.product_price.value,
+                     "StockNotFound"))
+                continue
+
+        return product_prices
+
+    def get_stocks(self, chunk, endpoint):
+        stock_list = getattr(self, "param_stock_list",
+                             self.integration.catalog.stock_list)
+        stock_batch = endpoint.list(params={"product__pk__in": ",".join(chunk),
+                                            "stock_list": stock_list})
+        return stock_batch
 
 
 class ProcessPriceBatchRequests(OmnitronCommandInterface, ProcessBatchRequests):

@@ -28,11 +28,13 @@ from channel_app.omnitron.commands.product_images import (
 from channel_app.omnitron.commands.product_prices import (
     GetUpdatedProductPrices, ProcessPriceBatchRequests,
     GetInsertedProductPrices, GetInsertedProductPricesFromExtraPriceList,
-    GetUpdatedProductPricesFromExtraPriceList)
+    GetUpdatedProductPricesFromExtraPriceList,
+    GetProductStocksFromProductPrices)
 from channel_app.omnitron.commands.product_stocks import (
     GetUpdatedProductStocks, ProcessStockBatchRequests,
     GetInsertedProductStocks, GetUpdatedProductStocksFromExtraStockList,
-    GetInsertedProductStocksFromExtraStockList)
+    GetInsertedProductStocksFromExtraStockList,
+    GetProductPricesFromProductStocks)
 from channel_app.omnitron.commands.products import (
     GetInsertedProducts,
     GetUpdatedProducts,
@@ -79,6 +81,8 @@ class OmnitronIntegration(BaseIntegration):
         "get_updated_stocks": GetUpdatedProductStocks,
         "get_inserted_stocks": GetInsertedProductStocks,
         "get_updated_stocks_from_extra_stock_list": GetUpdatedProductStocksFromExtraStockList,
+        "get_prices_from_product_stocks": GetProductPricesFromProductStocks,
+        "get_stocks_from_product_prices": GetProductStocksFromProductPrices,
         "get_inserted_stocks_from_extra_stock_list": GetInsertedProductStocksFromExtraStockList,
         "get_updated_prices": GetUpdatedProductPrices,
         "get_inserted_prices": GetInsertedProductPrices,
