@@ -2,7 +2,8 @@ from omnisdk.omnitron.endpoints import (ChannelAddressEndpoint,
                                         ChannelCountryEndpoint,
                                         ChannelCityEndpoint,
                                         ChannelTownshipEndpoint,
-                                        ChannelDistrictEndpoint)
+                                        ChannelDistrictEndpoint,
+                                        ChannelRetailStoreEndpoint)
 from omnisdk.omnitron.models import (City, Country, Township, District, Address,
                                      Customer)
 from requests import HTTPError
@@ -78,7 +79,26 @@ class GetOrCreateAddress(OmnitronCommandInterface):
             "identity_number": address.identity_number and address.identity_number[:64],
             "extra_field": address.extra_field or {}
         }
+        self.get_retail_store_id(address, data)
         return data
+
+    def get_retail_store_id(self, address, data):
+        """
+
+        :param data: omnitron address payload dict
+        :param address: AddressDto
+        """
+        if address.retail_store:
+            endpoint = ChannelRetailStoreEndpoint(
+                channel_id=self.integration.channel_id)
+            params = {"erp_code": address.retail_store}
+            retail_store = endpoint.list(params=params)
+            if len(retail_store) == 1:
+                data["retail_store"] = retail_store[0].pk
+                data["address_type"] = "retail_store"
+            else:
+                raise IntegrationMappingException(params={
+                    "code": address.retail_store})
 
     def send(self, validated_data) -> object:
         """

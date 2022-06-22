@@ -212,6 +212,7 @@ class AddressDto:
     identity_number: Optional[str] = None  # null
     extra_field: Optional[dict] = None  # {}
     is_active: Optional[bool] = True  # true
+    retail_store: Optional[str] = None
 
 
 @dataclass

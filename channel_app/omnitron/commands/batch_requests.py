@@ -41,6 +41,8 @@ class GetBatchRequests(OmnitronCommandInterface):
         if not params:
             return []
 
+        params.update({"channel": self.integration.channel_id})
+
         batch_requests = self.endpoint(
             channel_id=self.integration.channel_id
         ).list(params=params)
