@@ -149,6 +149,7 @@ class CreateOrders(OmnitronCommandInterface):
             "order_item": order_items,
             "order": {
                 "number": order.number[:128],
+                "status": order.status,
                 "channel": self.integration.channel_id,
                 "customer": order.customer,
                 "shipping_address": order.shipping_address,
