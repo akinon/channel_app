@@ -257,9 +257,7 @@ class CreateOrders(OmnitronCommandInterface):
                 "price_currency": item.price_currency,
                 "price": item.price,
                 "tax_rate": item.tax_rate,
-                "extra_field": {
-                    "id": item.remote_id
-                },
+                "extra_field": self.get_order_item_extra_field(item),
                 "price_list": item.price_list or price_list,
                 "stock_list": item.stock_list or stock_list,
                 "tracking_number": item.tracking_number,
