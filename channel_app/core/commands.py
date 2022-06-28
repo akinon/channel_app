@@ -111,7 +111,7 @@ class ChannelCommandInterface(CommandInterface):
             action_content_type=ContentType.batch_request.value,
             action_object_id=self.batch_request.pk,
             modified_date=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            error_code=f"{self.batch_request.local_batch_id}-{name}",
+            error_code=f"{self.batch_request.local_batch_id}-{name}-{datetime.now().timestamp()}",
             error_description=f"{self.batch_request.local_batch_id}-{name}",
             raw_request=f"{response.request.method}-"
                         f"{response.request.url}-"
@@ -129,7 +129,7 @@ class ChannelCommandInterface(CommandInterface):
                 action_content_type=failed_obj[1],
                 action_object_id=failed_obj[0].pk,
                 modified_date=failed_obj[0].modified_date,
-                error_code=f"{self.batch_request.local_batch_id}-{name}",
+                error_code=f"{self.batch_request.local_batch_id}-{name}-{datetime.now().timestamp()}",
                 error_description=f"{self.batch_request.local_batch_id}-{name}",
                 raw_request="",
                 raw_response=f"{failed_obj[0].failed_reason_type}-{failed_obj[2]}",
