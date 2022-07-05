@@ -117,12 +117,41 @@ class GetUpdatedProductStocksFromExtraStockList(OmnitronCommandInterface):
 class GetInsertedProductStocksFromExtraStockList(
     GetUpdatedProductStocksFromExtraStockList):
     """
-    Fetches updated and not sent stock objects from Omnitron
+    Fetches inserted stock data from Omnitron.
 
     Batch request state transition to fail or done
      :return: List[ProductStock] as output of do_action
     """
     path = "inserts"
+
+    def get_integration_actions(self, stocks: List[ProductStock]):
+        if not stocks:
+            return []
+
+        endpoint = ChannelIntegrationActionEndpoint(
+            channel_id=self.integration.channel_id)
+        product_ids = [str(stock.product) for stock in stocks]
+        product_ias = endpoint.list(
+            params={"object_id__in": ",".join(product_ids),
+                    "content_type_name": ContentType.product.value,
+                    "status": IntegrationActionStatus.success,
+                    "channel_id": self.integration.channel_id,
+                    })
+
+        for product_batch in endpoint.iterator:
+            product_ias.extend(product_batch)
+        product_integrations_by_id = {ia.object_id: ia for ia in product_ias}
+
+        for stock in stocks:
+            if stock.product in product_integrations_by_id:
+                product_ia = product_integrations_by_id[stock.product]
+                stock.remote_id = product_ia.remote_id
+            else:
+                stock.failed_reason_type = FailedReasonType.channel_app.value
+                self.failed_object_list.append(
+                    (stock, ContentType.product_stock.value,
+                     "Product has not been sent"))
+        return stocks
 
 
 class GetInsertedProductStocks(GetUpdatedProductStocks):

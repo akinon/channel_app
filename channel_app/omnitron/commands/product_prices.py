@@ -91,9 +91,9 @@ class GetInsertedProductPrices(GetUpdatedProductPrices):
         return prices
 
 
-class GetInsertedProductPricesFromExtraPriceList(OmnitronCommandInterface):
+class GetUpdatedProductPricesFromExtraPriceList(OmnitronCommandInterface):
     endpoint = ChannelExtraProductPriceEndpoint
-    path = "inserts"
+    path = "updates"
     BATCH_SIZE = 100
     content_type = ContentType.product_price.value
 
@@ -136,9 +136,36 @@ class GetInsertedProductPricesFromExtraPriceList(OmnitronCommandInterface):
         return prices
 
 
-class GetUpdatedProductPricesFromExtraPriceList(
-    GetInsertedProductPricesFromExtraPriceList):
-    path = "updates"
+class GetInsertedProductPricesFromExtraPriceList(
+    GetUpdatedProductPricesFromExtraPriceList):
+    path = "inserts"
+
+    def get_integration_actions(self, prices: List[ProductPrice]):
+        if not prices:
+            return []
+        endpoint = ChannelIntegrationActionEndpoint(
+            channel_id=self.integration.channel_id)
+        product_ids = [str(price.product) for price in prices]
+        product_ias = endpoint.list(
+            params={"object_id__in": ",".join(product_ids),
+                    "content_type_name": ContentType.product.value,
+                    "status": IntegrationActionStatus.success,
+                    "channel_id": self.integration.channel_id
+                    })
+        for product_batch in endpoint.iterator:
+            product_ias.extend(product_batch)
+        product_integrations_by_id = {ia.object_id: ia for ia in product_ias}
+
+        for price in prices:
+            if price.product in product_integrations_by_id:
+                product_ia = product_integrations_by_id[price.product]
+                price.remote_id = product_ia.remote_id
+            else:
+                price.failed_reason_type = FailedReasonType.channel_app.value
+                self.failed_object_list.append(
+                    (price, ContentType.product_price.value,
+                     "Product has not been sent"))
+        return prices
 
 
 class GetProductStocksFromProductPrices(OmnitronCommandInterface):
