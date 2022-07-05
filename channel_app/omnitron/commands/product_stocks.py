@@ -134,7 +134,6 @@ class GetInsertedProductStocksFromExtraStockList(
         product_ias = endpoint.list(
             params={"object_id__in": ",".join(product_ids),
                     "content_type_name": ContentType.product.value,
-                    "status": IntegrationActionStatus.success,
                     "channel_id": self.integration.channel_id,
                     })
 
