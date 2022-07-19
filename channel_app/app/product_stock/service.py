@@ -73,7 +73,7 @@ class StockService(object):
                     content_type=ContentType.product_stock.value) as omnitron_integration:
                 product_stocks = omnitron_integration.do_action(
                     key='get_updated_stocks_from_extra_stock_list',
-                    object=stock_list_id)
+                    objects=stock_list_id)
 
                 if add_product_objects:
                     product_stocks = product_stocks and omnitron_integration.do_action(
@@ -129,7 +129,7 @@ class StockService(object):
                     content_type=ContentType.product_stock.value) as omnitron_integration:
                 product_stocks = omnitron_integration.do_action(
                     key='get_inserted_stocks_from_extra_stock_list',
-                    object=stock_list_id)
+                    objects=stock_list_id)
 
                 if add_product_objects:
                     product_stocks = product_stocks and omnitron_integration.do_action(

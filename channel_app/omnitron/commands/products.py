@@ -145,7 +145,7 @@ class GetMappedProducts(OmnitronCommandInterface):
                 "Yaş Grubu": "",
                 "Garanti Süresi": "2",
                 "Taşıma Kapasitesi": "",
-                "Renk": "",
+                "Renk": "Kırmızı",
                 "Ek Özellikler": "WHITE_fixed-deger-123_1",
                 "Taşma Emniyeti": "WHITE",
                 "Cinsiyet": "std",
@@ -164,6 +164,14 @@ class GetMappedProducts(OmnitronCommandInterface):
                     "is_required": false,
                     "is_variant": false,
                     "is_custom": false,
+                    "is_meta": false
+                },
+                "attribute_omnitron_id": {
+                    "attribute_name": "Renk",
+                    "attribute_remote_id": 24,
+                    "is_required": false,
+                    "is_variant": false,
+                    "is_custom": true,
                     "is_meta": false
                 }
             }
@@ -208,6 +216,16 @@ class GetMappedProducts(OmnitronCommandInterface):
         attribute_id = str(config.attribute["pk"])
         attribute_value_conf = mapped_attribute_values.get(attribute_id)
         if not attribute_value_conf:
+            if not product.mapped_attributes.mapped_attribute_values.get(
+                    attribute_id, None):
+                product.mapped_attributes.mapped_attribute_values[
+                    attribute_id] = {
+                    "attribute_name": config.attribute.get("name"),
+                    "attribute_remote_id": config.attribute_remote_id,
+                    "is_required": config.is_required,
+                    "is_variant": config.is_variant,
+                    "is_custom": config.is_custom,
+                    "is_meta": config.is_meta}
             return False
         try:
             self.check_attribute_value_defined(config, mapped_attributes)
