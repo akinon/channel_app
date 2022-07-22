@@ -62,6 +62,28 @@ class GetOrderItems(OmnitronCommandInterface):
                                    objects=order_items)
         return order_items
 
+    def get_order_items(self, order):
+        params = {"order": order.pk}
+        endpoint = self.endpoint(channel_id=self.integration.channel_id)
+        order_items = endpoint.list(params=params)
+        for item in endpoint.iterator:
+            if not item:
+                break
+            order_items.extend(item)
+        return order_items
+
+
+class GetOrderItemsWithOrder(GetOrderItems):
+    endpoint = ChannelOrderItemEndpoint
+
+    def get_data(self):
+        orders = self.objects
+        for order in orders:
+            order_items = self.get_order_items(order)
+            order.orderitem_set = order_items
+
+        return orders
+
 
 class ProcessOrderBatchRequests(OmnitronCommandInterface, ProcessBatchRequests):
     """

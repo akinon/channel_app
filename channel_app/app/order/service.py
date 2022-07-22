@@ -132,11 +132,16 @@ class OrderService(object):
 
         return order
 
-    def update_orders(self, is_sync=True, is_success_log=True):
+    def update_orders(self, is_sync=True, is_success_log=True,
+                      add_order_items=False):
         with OmnitronIntegration(
                 content_type=ContentType.order.value) as omnitron_integration:
             orders = omnitron_integration.do_action(key='get_orders')
             orders: List[Order]
+
+            if add_order_items:
+                orders = orders and omnitron_integration.do_action(
+                    key='get_order_items_with_order', objects=orders)
 
             if not orders:
                 return
