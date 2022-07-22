@@ -21,7 +21,9 @@ from channel_app.omnitron.commands.orders.orders import (
     GetOrders,
     ProcessOrderBatchRequests,
     CreateOrderCancel,
-    GetCancellationRequest)
+    GetCancellationRequest,
+    GetOrderItems,
+    GetOrderItemsWithOrder)
 from channel_app.omnitron.commands.product_images import (
     GetUpdatedProductImages, GetInsertedProductImages,
     ProcessImageBatchRequests)
@@ -101,6 +103,8 @@ class OmnitronIntegration(BaseIntegration):
         "get_cargo_company": GetCargoCompany,
         "create_order": CreateOrders,
         "get_orders": GetOrders,
+        "get_order_items": GetOrderItems,
+        "get_order_items_with_order": GetOrderItemsWithOrder,
         "create_order_shipping_info": CreateOrderShippingInfo,
         "create_or_update_category_tree_and_nodes": CreateOrUpdateCategoryTreeAndNodes,
         "create_or_update_category_attributes": CreateOrUpdateCategoryAttributes,

@@ -198,8 +198,8 @@ class ProductService(object):
 
             for batch_request in batch_request_data:
                 response_data, report, data = ChannelIntegration().do_action(
-                    key='check_deleted_products',
-                    objects=batch_request)
+                    key='check_deleted_products', objects=batch_request,
+                    batch_request=batch_request)
 
                 # tips
                 response_data: List[ProductBatchRequestResponseDto]
@@ -214,7 +214,7 @@ class ProductService(object):
                     omnitron_integration.batch_request = batch_request
                     omnitron_integration.do_action(
                         key='process_delete_product_batch_requests',
-                        objects=batch_request)
+                        objects=response_data)
 
     def get_product_batch_requests(self, is_success_log=True):
         with OmnitronIntegration(create_batch=False) as omnitron_integration:
@@ -228,7 +228,8 @@ class ProductService(object):
 
             for batch_request in batch_request_data:
                 response_data, report, data = ChannelIntegration().do_action(
-                    key='check_products', objects=batch_request)
+                    key='check_products', objects=batch_request,
+                    batch_request=batch_request)
 
                 # tips
                 response_data: List[ProductBatchRequestResponseDto]
