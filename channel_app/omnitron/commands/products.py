@@ -119,6 +119,50 @@ class GetProductCategoryNodes(OmnitronCommandInterface):
         return products
 
 
+class GetProductCategoryNodesWithIntegrationAction(GetProductCategoryNodes):
+
+    def get_data(self) -> List[Product]:
+        """
+        :return:
+        """
+        products = super(GetProductCategoryNodesWithIntegrationAction,
+                         self).get_data()
+        self.get_category_node_integration_action(products)
+        return products
+
+    def get_category_node_integration_action(self, products: List[Product]):
+        if not products:
+            return []
+
+        category_node_ias_map = {}
+        for chunk in split_list(products, 20):
+            endpoint = ChannelIntegrationActionEndpoint(
+                channel_id=self.integration.channel_id)
+            products_category_node_ids = [
+                str(product.category_nodes[0].get('pk')) for product
+                in chunk if product.category_nodes[0].get('pk')]
+            category_node_ias = endpoint.list(
+                params={"object_id__in": ",".join(products_category_node_ids),
+                        "content_type_name": ContentType.category_node.value,
+                        "channel_id": self.integration.channel_id,
+                        "sort": "id"
+                        })
+
+            for category_node_ias_batch in endpoint.iterator:
+                category_node_ias.extend(category_node_ias_batch)
+
+            category_node_integrations_by_id = {ia.object_id: ia for ia in
+                                                category_node_ias}
+            category_node_ias_map.update(category_node_integrations_by_id)
+
+        for product in products:
+            product.category_nodes[0][
+                'integration_action'] = category_node_ias_map.get(
+                product.category_nodes[0].get('pk'))
+
+        return products
+
+
 class GetMappedProducts(OmnitronCommandInterface):
     endpoint = ChannelMappedProductEndpoint
     content_type = ContentType.product.value
@@ -487,6 +531,7 @@ class GetUpdatedProducts(GetInsertedProducts):
                 params={"object_id__in": ",".join(product_ids),
                         "content_type_name": ContentType.product.value,
                         "channel_id": self.integration.channel_id,
+                        "sort": "id"
                         })
 
             for product_batch in endpoint.iterator:
@@ -613,25 +658,26 @@ class ProcessDeletedProductBatchRequests(ProcessProductBatchRequests):
             endpoint.delete(id=integration_action.pk)
 
         # faulty integration action objects are reported
-        fail_integration_actions = self.get_integration_actions_for_remote_ids(
-            endpoint, fail_remote_ids)
+        if fail_remote_ids:
+            fail_integration_actions = self.get_integration_actions_for_remote_ids(
+                endpoint, fail_remote_ids)
 
-        for integration_action_obj in fail_integration_actions:
-            integration_action_obj.failed_reason_type = \
-                FailedReasonType.channel_app.value
+            for integration_action_obj in fail_integration_actions:
+                integration_action_obj.failed_reason_type = \
+                    FailedReasonType.channel_app.value
 
-        objects_data = self.create_batch_objects(
-            data=fail_integration_actions,
-            content_type=ContentType.integration_action.value)
-        # done
-        self.update_batch_request(objects_data=objects_data)
+            objects_data = self.create_batch_objects(
+                data=fail_integration_actions,
+                content_type=ContentType.integration_action.value)
+            # done
+            self.update_batch_request(objects_data=objects_data)
         return integration_actions
 
     def get_integration_actions_for_remote_ids(self, endpoint, remote_ids):
         integration_actions = endpoint.list(params={
             "remote_id__in": remote_ids,
             "channel": self.integration.channel_id,
-            "local_batch_id": self.integration.batch_request.local_batch_id,
+            "sort": "id"
         })
         for ia_batch in endpoint.iterator:
             if not ia_batch:
@@ -683,7 +729,8 @@ class GetProductObjects(OmnitronCommandInterface):
                 channel_id=self.integration.channel_id,
             )
             products = endpoint.list(
-                params={"pk__in": ",".join(c for c in chunk)})
+                params={"pk__in": ",".join(c for c in chunk),
+                        "sort": "id"})
 
             for product in endpoint.iterator:
                 if not product:

@@ -49,7 +49,8 @@ class GetUpdatedProductPrices(OmnitronCommandInterface):
             params={
                 "local_batch_id": self.integration.batch_request.local_batch_id,
                 "status": IntegrationActionStatus.processing,
-                "channel_id": self.integration.channel_id
+                "channel_id": self.integration.channel_id,
+                "sort": "id"
             })
         for price_batch in endpoint.iterator:
             price_integration_actions.extend(price_batch)
@@ -73,7 +74,8 @@ class GetInsertedProductPrices(GetUpdatedProductPrices):
             params={"object_id__in": ",".join(product_ids),
                     "content_type_name": ContentType.product.value,
                     "status": IntegrationActionStatus.success,
-                    "channel_id": self.integration.channel_id
+                    "channel_id": self.integration.channel_id,
+                    "sort": "id"
                     })
         for product_batch in endpoint.iterator:
             product_ias.extend(product_batch)
@@ -125,7 +127,8 @@ class GetUpdatedProductPricesFromExtraPriceList(OmnitronCommandInterface):
         price_integration_actions = endpoint.list(
             params={
                 "local_batch_id": self.integration.batch_request.local_batch_id,
-                "status": IntegrationActionStatus.processing
+                "status": IntegrationActionStatus.processing,
+                "sort": "id"
             })
         for price_batch in endpoint.iterator:
             price_integration_actions.extend(price_batch)
@@ -149,7 +152,8 @@ class GetInsertedProductPricesFromExtraPriceList(
         product_ias = endpoint.list(
             params={"object_id__in": ",".join(product_ids),
                     "content_type_name": ContentType.product.value,
-                    "channel_id": self.integration.channel_id
+                    "channel_id": self.integration.channel_id,
+                    "sort": "id"
                     })
         for product_batch in endpoint.iterator:
             product_ias.extend(product_batch)
