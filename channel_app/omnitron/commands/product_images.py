@@ -48,7 +48,8 @@ class GetUpdatedProductImages(OmnitronCommandInterface):
             params={
                 "local_batch_id": self.integration.batch_request.local_batch_id,
                 "status": IntegrationActionStatus.processing,
-                "channel_id": self.integration.channel_id
+                "channel_id": self.integration.channel_id,
+                "sort": "id"
             }
         )
         for image_batch in endpoint.iterator:
@@ -76,7 +77,8 @@ class GetInsertedProductImages(GetUpdatedProductImages):
             params={"object_id__in": ",".join(product_ids),
                     "content_type_name": ContentType.product.value,
                     "status": IntegrationActionStatus.success,
-                    "channel_id": self.integration.channel_id
+                    "channel_id": self.integration.channel_id,
+                    "sort": "id"
                     })
         for product_batch in endpoint.iterator:
             product_ias.extend(product_batch)

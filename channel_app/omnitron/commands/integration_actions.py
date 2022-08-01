@@ -128,6 +128,7 @@ class GetIntegrationActions(OmnitronCommandInterface):
             channel_id=self.integration.channel_id)
         self.objects.update({
             "channel_id": self.integration.channel_id,
+            "sort": "id"
         })
         integration_action_list = integration_action_endpoint.list(
             params=self.objects)

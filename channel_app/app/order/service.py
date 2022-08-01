@@ -212,7 +212,9 @@ class OrderService(object):
         with OmnitronIntegration(
                 content_type=ContentType.order.value) as omnitron_integration:
             get_cancelled_order = ChannelIntegration().do_action(
-                key='get_cancelled_orders')
+                key='get_cancelled_orders',
+                batch_request=omnitron_integration.batch_request
+            )
             get_cancelled_order: Generator
 
             while True:

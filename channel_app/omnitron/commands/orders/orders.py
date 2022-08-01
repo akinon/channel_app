@@ -63,7 +63,7 @@ class GetOrderItems(OmnitronCommandInterface):
         return order_items
 
     def get_order_items(self, order):
-        params = {"order": order.pk}
+        params = {"order": order.pk, "sort": "id"}
         endpoint = self.endpoint(channel_id=self.integration.channel_id)
         order_items = endpoint.list(params=params)
         for item in endpoint.iterator:
@@ -253,7 +253,7 @@ class CreateOrders(OmnitronCommandInterface):
         self.update_batch_request(objects_data=objects_data)
 
     def get_order_items(self, order_pk):
-        params = {"order": order_pk}
+        params = {"order": order_pk, "sort": "id"}
         endpoint = ChannelOrderItemEndpoint(
             channel_id=self.integration.channel_id)
         order_items = endpoint.list(params=params)
@@ -308,7 +308,7 @@ class CreateOrders(OmnitronCommandInterface):
         product_integration_actions = []
         for chunk in split_list(product_remote_ids, self.CHUNK_SIZE):
             params = {"channel": self.integration.channel_id,
-                      "content_type_model": ContentType.product.value,
+                      "content_type_name": ContentType.product.value,
                       "remote_id__in": ",".join(chunk)}
             ia = endpoint.list(params=params)
             product_integration_actions.extend(ia)
@@ -387,7 +387,7 @@ class CreateOrderCancel(OmnitronCommandInterface):
         end_point = ChannelIntegrationActionEndpoint(
             channel_id=self.integration.channel_id)
         params = {"channel": self.integration.channel_id,
-                  "content_type_model": ContentType.order.value,
+                  "content_type_name": ContentType.order.value,
                   "remote_id": order_remote_id}
         integration_actions = end_point.list(params=params)
         if not integration_actions:
@@ -416,8 +416,9 @@ class CreateOrderCancel(OmnitronCommandInterface):
         object_ids = {}
         for order_item_remote_id in cancel_items:
             params = {"channel": self.integration.channel_id,
-                      "content_type_model": ContentType.order_item.value,
-                      "remote_id": order_item_remote_id}
+                      "content_type_name": ContentType.order_item.value,
+                      "remote_id": order_item_remote_id,
+                      "sort": "id"}
             integration_actions = end_point.list(params=params)
             for item in end_point.iterator:
                 if not item:

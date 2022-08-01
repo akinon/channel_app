@@ -53,7 +53,8 @@ class GetUpdatedProductStocks(OmnitronCommandInterface):
             params={
                 "local_batch_id": self.integration.batch_request.local_batch_id,
                 "status": IntegrationActionStatus.processing,
-                "channel_id": self.integration.channel_id
+                "channel_id": self.integration.channel_id,
+                "sort": "id"
             })
         for stock_batch in endpoint.iterator:
             stock_integration_actions.extend(stock_batch)
@@ -103,7 +104,8 @@ class GetUpdatedProductStocksFromExtraStockList(OmnitronCommandInterface):
         stock_integration_actions = endpoint.list(
             params={
                 "local_batch_id": self.integration.batch_request.local_batch_id,
-                "status": IntegrationActionStatus.processing
+                "status": IntegrationActionStatus.processing,
+                "sort": "id"
             })
         for stock_batch in endpoint.iterator:
             stock_integration_actions.extend(stock_batch)
@@ -135,6 +137,7 @@ class GetInsertedProductStocksFromExtraStockList(
             params={"object_id__in": ",".join(product_ids),
                     "content_type_name": ContentType.product.value,
                     "channel_id": self.integration.channel_id,
+                    "sort": "id"
                     })
 
         for product_batch in endpoint.iterator:
@@ -172,6 +175,7 @@ class GetInsertedProductStocks(GetUpdatedProductStocks):
                     "content_type_name": ContentType.product.value,
                     "status": IntegrationActionStatus.success,
                     "channel_id": self.integration.channel_id,
+                    "sort": "id"
                     })
         for product_batch in endpoint.iterator:
             product_ias.extend(product_batch)

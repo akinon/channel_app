@@ -49,7 +49,8 @@ from channel_app.omnitron.commands.products import (
     GetInsertedOrUpdatedProducts,
     GetProductCategoryNodes, GetProductObjects, GetProductsFromBatchrequest,
     GetProductPricesWithOutCommit, GetProductStocksWithOutCommit,
-    GetMappedProductsWithOutCommit)
+    GetMappedProductsWithOutCommit,
+    GetProductCategoryNodesWithIntegrationAction)
 from channel_app.omnitron.commands.setup import (
     CreateOrUpdateCategoryTreeAndNodes, CreateOrUpdateCategoryAttributes,
     GetCategoryIds, CreateOrUpdateChannelAttributeSet,
@@ -79,6 +80,7 @@ class OmnitronIntegration(BaseIntegration):
         "get_product_stocks": GetProductStocks,
         "get_product_stocks_without_commit": GetProductStocksWithOutCommit,
         "get_product_categories": GetProductCategoryNodes,
+        "get_product_categories_with_integration_action": GetProductCategoryNodesWithIntegrationAction,
         "get_batch_requests": GetBatchRequests,
         "get_updated_stocks": GetUpdatedProductStocks,
         "get_inserted_stocks": GetInsertedProductStocks,
