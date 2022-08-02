@@ -428,6 +428,10 @@ class GetProductPrices(OmnitronCommandInterface):
     def get_prices(self, chunk, endpoint):
         price_batch = endpoint.list(params={"product__pk__in": ",".join(chunk),
                                             "price_list": self.integration.catalog.price_list})
+        for item in endpoint.iterator:
+            if not item:
+                break
+            price_batch.extend(item)
         return price_batch
 
 
@@ -502,6 +506,10 @@ class GetProductStocks(OmnitronCommandInterface):
     def get_stocks(self, chunk, endpoint):
         stock_batch = endpoint.list(params={"product__pk__in": ",".join(chunk),
                                             "stock_list": self.integration.catalog.stock_list})
+        for item in endpoint.iterator:
+            if not item:
+                break
+            stock_batch.extend(item)
         return stock_batch
 
 
