@@ -105,7 +105,7 @@ class ProcessOrderBatchRequests(OmnitronCommandInterface, ProcessBatchRequests):
 
     @property
     def update_state(self, *args, **kwargs) -> BatchRequestStatus:
-        return BatchRequestStatus.done
+        return BatchRequestStatus.commit
 
     def get_remote_order_number(self, obj, integration_actions):
         for integration_action in integration_actions:
