@@ -309,9 +309,16 @@ class CreateOrders(OmnitronCommandInterface):
         for chunk in split_list(product_remote_ids, self.CHUNK_SIZE):
             params = {"channel": self.integration.channel_id,
                       "content_type_name": ContentType.product.value,
-                      "remote_id__in": ",".join(chunk)}
+                      "remote_id__in": ",".join(chunk),
+                      "sort": "id"}
             ia = endpoint.list(params=params)
+            for item in endpoint.iterator:
+                if not item:
+                    break
+                ia.extend(item)
+
             product_integration_actions.extend(ia)
+
         return {ia.remote_id: ia.object_id for ia in
                 product_integration_actions}
 
