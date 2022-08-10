@@ -379,16 +379,6 @@ class CreateOrderCancel(OmnitronCommandInterface):
         for key, pk_list in order_item_dict.items():
             order_item_pk_list.extend(pk_list)
 
-        not_cancelled_order_item_pk_list = self.get_not_cancelled_order_items(
-            order_pk=order_pk)
-
-        order_item_pk_list = list(
-            set(order_item_pk_list) & set(not_cancelled_order_item_pk_list)
-        )
-
-        if not order_item_pk_list:
-            return None
-
         reasons = self.get_reasons_data(order_item_dict=order_item_dict,
                                         reasons=cancel_data.reasons)
 
@@ -453,30 +443,6 @@ class CreateOrderCancel(OmnitronCommandInterface):
 
         return object_ids
 
-    def get_not_cancelled_order_items(self, order_pk) -> List:
-        """
-        Returns neither cancelled nor refunded order items pk list
-        @param: order_pk: int -> 4
-        @return: List[order_item_pks] -> [12, 15]
-        """
-        not_cancelled_order_items = []
-        endpoint = ChannelOrderItemEndpoint(
-            channel_id=self.integration.channel_id)
-        order_items = endpoint.list(params={
-            "order": order_pk,
-        })
-
-        for item in endpoint.iterator:
-            if not item:
-                break
-            order_items.extend(item)
-
-        for order_item in order_items:
-            if order_item.status not in ["50", "100", "600"]:
-                not_cancelled_order_items.append(order_item.pk)
-
-        return not_cancelled_order_items
-
     def get_reasons_data(self, order_item_dict: dict, reasons: dict):
         """
         order_item_dict: dict  # {remote_basketitem_id: [id1,id2]}
@@ -498,14 +464,12 @@ class CreateOrderCancel(OmnitronCommandInterface):
         return reasons_dict
 
     def send(self, validated_data) -> Order:
-        if validated_data:
-            path = self.path.format(pk=validated_data["order"])
-            endpoint = self.endpoint(path=path,
-                                     channel_id=self.integration.channel_id,
-                                     raw=True)
-            response = endpoint.create(item=validated_data)
-            return response
-        return None
+        path = self.path.format(pk=validated_data["order"])
+        endpoint = self.endpoint(path=path,
+                                 channel_id=self.integration.channel_id,
+                                 raw=True)
+        response = endpoint.create(item=validated_data)
+        return response
 
     def normalize_response(self, data, response) -> List[object]:
         return [data]
