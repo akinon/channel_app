@@ -124,7 +124,7 @@ class ProcessBatchRequests(object):
         products = []
         for chunk_id_list in split_list(id_list, self.CHUNK_SIZE):
             products_batch = end_point.list(
-                params={"pk__in": ",".join(id_list),
+                params={"pk__in": ",".join(chunk_id_list),
                         "limit": len(chunk_id_list)})
             products.extend(products_batch)
 

@@ -243,7 +243,8 @@ class GetProductStocksFromProductPrices(OmnitronCommandInterface):
         stock_list = getattr(self, "param_stock_list",
                              self.integration.catalog.stock_list)
         stock_batch = endpoint.list(params={"product__pk__in": ",".join(chunk),
-                                            "stock_list": stock_list})
+                                            "stock_list": stock_list,
+                                            "limit": len(chunk)})
         return stock_batch
 
 
