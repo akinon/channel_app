@@ -140,7 +140,7 @@ class ProcessOrderBatchRequests(OmnitronCommandInterface, ProcessBatchRequests):
         orders = []
         for chunk_id_list in split_list(id_list, self.CHUNK_SIZE):
             orders_batch = end_point.list(
-                params={"id__in": ",".join(chunk_id_list),
+                params={"pk__in": ",".join(chunk_id_list),
                         "limit": len(chunk_id_list)})
             orders.extend(orders_batch)
         return {order.pk: order for order in orders}
