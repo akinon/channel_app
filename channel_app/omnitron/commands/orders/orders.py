@@ -1,3 +1,4 @@
+from dataclasses import asdict
 from typing import List
 
 from omnisdk.omnitron.endpoints import (ChannelCreateOrderEndpoint,
@@ -500,3 +501,82 @@ class GetCancellationRequest(OmnitronCommandInterface):
                 break
             cancellation_requests.extend(batch)
         return cancellation_requests
+
+
+class UpdateOrderItems(OmnitronCommandInterface):
+    endpoint = ChannelOrderItemEndpoint
+    order_item_pk = None
+    order_item = None
+
+    def get_data(self) -> object:
+        """
+        {
+            "remote_id": "12049323",
+            "status": 550,
+            "invoice_number": "xyz",
+            "invoice_date": None",
+            "tracking_number": "TRACK-1"
+        }
+        """
+        order_item = self.objects
+        self.order_item_pk = self.get_order_item_pk(order_item.remote_id)
+        self.order_item = self.get_order_item(self.order_item_pk)
+        if not self.order_item_pk or not self.order_item:
+            return
+        return order_item
+
+    def validated_data(self, data):
+        if not data:
+            return
+        validated_data = asdict(data)
+        validated_data.pop("remote_id")
+        validated_data.pop("order_remote_id")
+        validated_data = filter(lambda item: bool(item[1]) is True,
+                                validated_data.items())
+        validated_data = dict(validated_data)
+
+        for key, val in validated_data.items():
+            if getattr(self.order_item, key) != val:
+                break
+        else:   # if no changes detected, return None
+            return
+
+        return validated_data
+
+    def get_order_item(self, pk):
+        if not pk:      # if get_order_item_pk returns None
+            return
+        end_point = ChannelOrderItemEndpoint(
+            channel_id=self.integration.channel_id)
+
+        order_item = end_point.retrieve(id=pk)
+        return order_item
+
+    def get_order_item_pk(self, order_item_remote_id):
+        end_point = ChannelIntegrationActionEndpoint(
+            channel_id=self.integration.channel_id)
+        params = {"channel": self.integration.channel_id,
+                  "content_type_name": ContentType.order_item.value,
+                  "remote_id": order_item_remote_id}
+        integration_actions = end_point.list(params=params)
+        if not integration_actions and len(integration_actions) != 1:
+            return
+        integration_action = integration_actions[0]
+        object_id = integration_action.object_id
+        return object_id
+
+    def send(self, validated_data) -> object:
+        if not validated_data:
+            return
+        response = self.endpoint(
+            channel_id=self.integration.channel_id, raw=True
+        ).update(
+            id=self.order_item_pk, item=validated_data
+        )
+        return response
+
+    def normalize_response(self, data, response) -> List[object]:
+        return [response]
+
+    def update_state(self, *args, **kwargs) -> BatchRequestStatus:
+        return BatchRequestStatus.commit

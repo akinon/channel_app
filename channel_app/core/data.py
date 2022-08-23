@@ -152,6 +152,8 @@ class OrderItemDto:
     price_list: Optional[int] = None
     stock_list: Optional[int] = None
     tracking_number: Optional[str] = None
+    invoice_number: Optional[str] = None
+    invoice_date: Optional[str] = None
     carrier_shipping_code: Optional[str] = ""
     discount_amount: Optional[Decimal] = 0.0
     retail_price: Optional[Decimal] = 0.0
@@ -227,3 +229,14 @@ class ChannelOrderDto(OmnitronOrderDto):
 class ChannelCreateOrderDto:
     order: ChannelOrderDto
     order_item: List[OrderItemDto]
+
+
+@dataclass
+class ChannelUpdateOrderItemDto:
+    remote_id: str
+    order_remote_id: Optional[str] = None
+    order_number: Optional[str] = None
+    status: Optional[str] = None
+    invoice_number: Optional[str] = None
+    invoice_date: Optional[str] = None
+    tracking_number: Optional[str] = None

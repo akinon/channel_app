@@ -1,7 +1,8 @@
+import json
 import logging
-from datetime import datetime
 
 from celery import current_app as app
+from requests import Response, Request
 
 from channel_app.core.clients import RedisClient
 
@@ -97,3 +98,38 @@ def lowercase_keys(obj):
                     value[idx] = lowercase_keys(value[idx])
             obj[key] = value
     return obj
+
+
+class MockResponse(Response):
+    def __init__(self,
+                 url='http://example.com',
+                 headers={"Content-Type": "application/json",
+                          "charset": "UTF-8"},
+                 status_code=200,
+                 reason='Success',
+                 _content='Some html goes here',
+                 json_=None,
+                 encoding='UTF-8',
+                 request_body={}
+                 ):
+        request = Request()
+        request.body = request_body
+        request.url = url
+        self.request = request
+        self.url = url
+        self.headers = headers
+        if json_ and headers['Content-Type'] == 'application/json':
+            self._content = json.dumps(json_).encode(encoding)
+        else:
+            self._content = _content.encode(encoding)
+
+        self.status_code = status_code
+        self.reason = reason
+        self.encoding = encoding
+
+
+def mock_response_decorator(func):
+    def wrapper(*args, **kwargs):
+        return MockResponse(json_=func(*args, **kwargs))
+
+    return wrapper

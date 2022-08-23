@@ -8,7 +8,8 @@ from channel_app.core import settings
 from channel_app.core.data import (OmnitronCreateOrderDto, OmnitronOrderDto,
                                    ChannelCreateOrderDto,
                                    ErrorReportDto,
-                                   OrderBatchRequestResponseDto, CancelOrderDto)
+                                   OrderBatchRequestResponseDto, CancelOrderDto,
+                                   ChannelUpdateOrderItemDto)
 from channel_app.core.settings import OmnitronIntegration, ChannelIntegration
 from channel_app.omnitron.batch_request import ClientBatchRequest
 from channel_app.omnitron.constants import ContentType
@@ -131,6 +132,43 @@ class OrderService(object):
             return
 
         return order
+
+    def fetch_and_update_order_items(self, is_success_log=True):
+        with OmnitronIntegration(
+                content_type=ContentType.order.value) as omnitron_integration:
+            get_updated_orders = ChannelIntegration().do_action(
+                key='get_updated_order_items',
+                batch_request=omnitron_integration.batch_request
+            )
+            get_updated_orders: Generator
+            order_batch_objects = []
+            while True:
+                try:
+                    channel_update_order, report, _ = next(get_updated_orders)
+                except StopIteration:
+                    break
+
+                # tips
+                channel_update_order: ChannelUpdateOrderItemDto
+                report: ErrorReportDto
+
+                if report and (is_success_log or not report.is_ok):
+                    report.error_code = \
+                        f"{omnitron_integration.batch_request.local_batch_id}" \
+                        f"_GetUpdatedOrders_{channel_update_order.remote_id}"
+                    omnitron_integration.do_action(
+                        key='create_error_report',
+                        objects=report)
+
+                omnitron_integration.do_action(
+                    key='update_order_items', objects=channel_update_order)
+
+            omnitron_integration.batch_request.objects = order_batch_objects
+
+            self.batch_service(settings.OMNITRON_CHANNEL_ID).to_done(
+                batch_request=omnitron_integration.batch_request
+            )
+
 
     def update_orders(self, is_sync=True, is_success_log=True,
                       add_order_items=False):

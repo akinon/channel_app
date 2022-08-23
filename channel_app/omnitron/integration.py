@@ -23,7 +23,7 @@ from channel_app.omnitron.commands.orders.orders import (
     CreateOrderCancel,
     GetCancellationRequest,
     GetOrderItems,
-    GetOrderItemsWithOrder)
+    GetOrderItemsWithOrder, UpdateOrderItems)
 from channel_app.omnitron.commands.product_images import (
     GetUpdatedProductImages, GetInsertedProductImages,
     ProcessImageBatchRequests)
@@ -135,6 +135,7 @@ class OmnitronIntegration(BaseIntegration):
         "get_product_objects": GetProductObjects,
         "get_product_from_batch_request": GetProductsFromBatchrequest,
         "get_cancellation_requests": GetCancellationRequest,
+        "update_order_items": UpdateOrderItems
         # "fetch_cancellation_plan": FetchCancellationPlan
     }
 
