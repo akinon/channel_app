@@ -8,7 +8,7 @@ from channel_app.core.commands import ChannelCommandInterface
 from channel_app.core.data import (ErrorReportDto, ChannelCreateOrderDto,
                                    AddressDto, CustomerDto, ChannelOrderDto,
                                    OrderItemDto, OrderBatchRequestResponseDto,
-                                   CancelOrderDto)
+                                   CancelOrderDto, ChannelUpdateOrderItemDto)
 from channel_app.omnitron.constants import ResponseStatus
 
 
@@ -174,6 +174,7 @@ class SendUpdatedOrders(ChannelCommandInterface):
          },]
         """
         response_data = []
+        prefix = "order"
         for index, item in enumerate(data):
             if random() < 0.8:
                 response_item = {
@@ -327,3 +328,44 @@ class GetCancelledOrders(ChannelCommandInterface):
             }
             response_data.append(response_item)
         return response_data
+
+
+class GetUpdatedOrderItems(ChannelCommandInterface):
+    def get_data(self):
+        data = self.objects
+        return data
+
+    def validated_data(self, data) -> object:
+        return data
+
+    def transform_data(self, data) -> object:
+        return data
+
+    def send_request(self, validated_data) -> object:
+        response = self.__mocked_request(data=validated_data)
+        return response
+
+    def normalize_response(self, data, validated_data, transformed_data,
+                           response) -> Tuple[ChannelUpdateOrderItemDto,
+                                              ErrorReportDto, Any]:
+        """
+        Convert ChannelUpdateOrderItemDto to the format OmnitronIntegration
+        """
+        for response_order_data in response:
+            order_items_data = response_order_data["order_items"]
+
+            report = self.create_report(response_order_data)
+            for order_item_data in order_items_data:
+                channel_update_order_item = ChannelUpdateOrderItemDto(
+                    **order_item_data)
+
+                yield channel_update_order_item, report, None
+
+    def __mocked_request(self, data):
+        return {
+            "remote_id": "XYAD123213",
+            "status": "550",
+            "invoice_number": "1234",
+            "invoice_date": None,
+            "tracking_number": "400"
+        }
