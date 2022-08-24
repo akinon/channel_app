@@ -37,6 +37,19 @@ class CategoryAttributeDto:
 
 
 @dataclass
+class AttributeValueDto:
+    remote_id: str
+    name: str
+
+
+@dataclass
+class AttributeDto:
+    remote_id: str
+    name: str
+    values: List[AttributeValueDto]
+
+
+@dataclass
 class CategoryDto:
     remote_id: str
     name: str

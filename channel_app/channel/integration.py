@@ -13,7 +13,8 @@ from channel_app.channel.commands.products import (
     SendInsertedProducts, CheckProducts, CheckDeletedProducts,
     SendUpdatedProducts, SendDeletedProducts)
 from channel_app.channel.commands.setup import (
-    GetCategoryTreeAndNodes, GetCategoryAttributes, GetChannelConfSchema)
+    GetCategoryTreeAndNodes, GetCategoryAttributes, GetChannelConfSchema,
+    GetAttributes)
 from channel_app.core.integration import BaseIntegration
 
 
@@ -43,6 +44,7 @@ class ChannelIntegration(BaseIntegration):
         "get_category_tree_and_nodes": GetCategoryTreeAndNodes,
         "get_channel_conf_schema": GetChannelConfSchema,
         "get_category_attributes": GetCategoryAttributes,
+        "get_attributes": GetAttributes,
         "get_orders": GetOrders,
         "get_updated_order_items": GetUpdatedOrderItems,
         "send_updated_orders": SendUpdatedOrders,
