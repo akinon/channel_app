@@ -182,7 +182,8 @@ class ProcessBatchRequests(object):
             channel_id=self.integration.channel_id)
         images = []
         for chunk in split_list(id_list, self.CHUNK_SIZE):
-            image_batch = endpoint.list(params={"id__in": ",".join(chunk)})
+            image_batch = endpoint.list(params={"id__in": ",".join(chunk),
+                                                "limit": len(chunk)})
             images.extend(image_batch)
             if not image_batch:
                 break
