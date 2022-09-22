@@ -659,16 +659,23 @@ class ProcessDeletedProductBatchRequests(ProcessProductBatchRequests):
             else:
                 fail_remote_ids.append(remote_item.remote_id)
 
-        integration_actions = self.get_integration_actions_for_remote_ids(
-            endpoint, remote_ids)
-        # successful integration action objects are deleted
-        for integration_action in integration_actions:
-            endpoint.delete(id=integration_action.pk)
+        if remote_ids:
+            integration_actions = self.get_integration_actions_for_remote_ids(
+                remote_ids)
+
+            # successful integration action objects are deleted
+            for integration_action in integration_actions:
+                if integration_action.content_type.get(
+                        "model") in [ContentType.product.value,
+                                     ContentType.product_price.value,
+                                     ContentType.product_stock.value,
+                                     ContentType.product_image.value]:
+                    endpoint.delete(id=integration_action.pk)
 
         # faulty integration action objects are reported
         if fail_remote_ids:
             fail_integration_actions = self.get_integration_actions_for_remote_ids(
-                endpoint, fail_remote_ids)
+                fail_remote_ids)
 
             for integration_action_obj in fail_integration_actions:
                 integration_action_obj.failed_reason_type = \
@@ -681,17 +688,24 @@ class ProcessDeletedProductBatchRequests(ProcessProductBatchRequests):
             self.update_batch_request(objects_data=objects_data)
         return integration_actions
 
-    def get_integration_actions_for_remote_ids(self, endpoint, remote_ids):
-        integration_actions = endpoint.list(params={
-            "remote_id__in": remote_ids,
-            "channel": self.integration.channel_id,
-            "sort": "id"
-        })
-        for ia_batch in endpoint.iterator:
-            if not ia_batch:
-                break
-            integration_actions.extend(ia_batch)
-        return integration_actions
+    def get_integration_actions_for_remote_ids(self, remote_ids):
+        if not remote_ids:
+            return []
+        integration_actions_list = []
+        for chunk in split_list(remote_ids, 10):
+            endpoint = ChannelIntegrationActionEndpoint(
+                channel_id=self.integration.channel_id)
+            integration_actions = endpoint.list(params={
+                "remote_id__in": ",".join(str(r) for r in chunk),
+                "channel": self.integration.channel_id,
+                "sort": "id"
+            })
+            for ia_batch in endpoint.iterator:
+                if not ia_batch:
+                    break
+                integration_actions.extend(ia_batch)
+            integration_actions_list.extend(integration_actions)
+        return [ial for ial in integration_actions_list if ial.remote_id in remote_ids]
 
 
 class GetProductObjects(OmnitronCommandInterface):
