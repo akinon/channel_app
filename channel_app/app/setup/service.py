@@ -82,7 +82,7 @@ class SetupService(object):
                     objects={"name": f"{settings.OMNITRON_CHANNEL_ID} {attribute.name} Schema"},
                 )
                 for attr_value in attribute.values:
-                    self.integration.do_action(
+                    omnitron_integration.do_action(
                         key="create_or_update_channel_attribute_value",
                         objects={
                             "attribute": attr.pk,
