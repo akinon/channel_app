@@ -653,6 +653,7 @@ class ProcessDeletedProductBatchRequests(ProcessProductBatchRequests):
 
         remote_ids = []
         fail_remote_ids = []
+        integration_actions = []
         for remote_item in channel_response:
             if remote_item.status == ResponseStatus.success:
                 remote_ids.append(remote_item.remote_id)
