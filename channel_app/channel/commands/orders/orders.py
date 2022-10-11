@@ -24,8 +24,8 @@ class GetOrders(ChannelCommandInterface):
     def transform_data(self, data) -> object:
         return data
 
-    def send_request(self, validated_data) -> object:
-        response = self.__mocked_request(data=validated_data)
+    def send_request(self, transformed_data) -> object:
+        response = self.__mocked_request(data=transformed_data)
         return response
 
     def normalize_response(self, data, validated_data, transformed_data,
@@ -341,8 +341,8 @@ class GetUpdatedOrderItems(ChannelCommandInterface):
     def transform_data(self, data) -> object:
         return data
 
-    def send_request(self, validated_data) -> object:
-        response = self.__mocked_request(data=validated_data)
+    def send_request(self, transformed_data) -> object:
+        response = self.__mocked_request(data=transformed_data)
         return response
 
     def normalize_response(self, data, validated_data, transformed_data,
