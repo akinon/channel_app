@@ -5,7 +5,7 @@ with open("README.md") as f:
 
 setup(
     name="channel_app",
-    version="0.0.122",
+    version="0.0.123",
     packages=find_packages(),
     url="https://github.com/akinon/channel_app",
     description="Channel app for Sales Channels",
