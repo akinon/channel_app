@@ -275,7 +275,7 @@ class OmnitronCommandInterface(CommandInterface):
             action_content_type=ContentType.batch_request.value,
             action_object_id=self.integration.batch_request.pk,
             modified_date=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            error_code=f"{self.integration.batch_request.local_batch_id}-{name}",
+            error_code=f"{self.integration.batch_request.local_batch_id}-{name}-{datetime.now().microsecond}",
             error_description=f"{self.integration.batch_request.local_batch_id}-{name}",
             raw_request=raw_request,
             raw_response=raw_response
