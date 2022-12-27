@@ -327,6 +327,11 @@ class CreateOrders(OmnitronCommandInterface):
         product_remote_ids = [item.product for item in order_items]
         return product_remote_ids
 
+    def check_run(self, is_ok, formatted_data):
+        if is_ok and formatted_data and self.is_batch_request:
+            return True
+        return False
+
 
 class CreateOrderShippingInfo(OmnitronCommandInterface):
     endpoint = ChannelOrderShippingInfoEndpoint
