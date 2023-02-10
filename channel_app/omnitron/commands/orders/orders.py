@@ -324,7 +324,7 @@ class CreateOrders(OmnitronCommandInterface):
                 product_integration_actions}
 
     def get_product_remote_id_list(self, order_items: List[OrderItemDto]):
-        product_remote_ids = [item.product for item in order_items]
+        product_remote_ids = list(set(item.product for item in order_items))
         return product_remote_ids
 
     def check_run(self, is_ok, formatted_data):
