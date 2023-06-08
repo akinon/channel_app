@@ -3,7 +3,7 @@ from typing import List
 from omnisdk.omnitron.endpoints import ChannelIntegrationActionEndpoint, \
     ChannelProductPriceEndpoint, ChannelBatchRequestEndpoint, \
     ChannelExtraProductPriceEndpoint, ChannelExtraProductStockEndpoint
-from omnisdk.omnitron.models import ProductPrice
+from omnisdk.omnitron.models import ProductPrice, Product
 
 from channel_app.core.commands import OmnitronCommandInterface
 from channel_app.core.data import BatchRequestResponseDto
@@ -211,8 +211,13 @@ class GetProductStocksFromProductPrices(OmnitronCommandInterface):
             empty_list: List[ProductPrice] = []
             return empty_list
 
-        product_ids = [str(pp.product) for pp in product_prices if
-                       not getattr(pp, "failed_reason_type", None)]
+        product_ids = []
+        for pp in product_prices:
+            if not getattr(pp, "failed_reason_type", None):
+                if isinstance(pp.product, Product):
+                    product_ids.append(str(pp.product.pk))
+                else:
+                    product_ids.append(pp.product)
 
         endpoint = self.endpoint(channel_id=self.integration.channel_id)
         stocks = []
@@ -228,8 +233,12 @@ class GetProductStocksFromProductPrices(OmnitronCommandInterface):
             if getattr(product_price, "failed_reason_type", None):
                 continue
             try:
-                product_price.productstock = product_stocks[
-                    product_price.product]
+                if isinstance(product_price.product, Product):
+                    product_price.productstock = product_stocks[
+                        product_price.product.pk]
+                else:
+                    product_price.productstock = product_stocks[
+                        product_price.product]
             except KeyError:
                 product_price.failed_reason_type = FailedReasonType.channel_app.value
                 self.failed_object_list.append(
