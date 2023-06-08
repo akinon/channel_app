@@ -5,7 +5,7 @@ from omnisdk.omnitron.endpoints import (ChannelProductStockEndpoint,
                                         ChannelBatchRequestEndpoint,
                                         ChannelExtraProductStockEndpoint,
                                         ChannelExtraProductPriceEndpoint)
-from omnisdk.omnitron.models import ProductStock
+from omnisdk.omnitron.models import ProductStock, Product
 
 from channel_app.core.commands import OmnitronCommandInterface
 from channel_app.core.data import BatchRequestResponseDto
@@ -234,8 +234,14 @@ class GetProductPricesFromProductStocks(OmnitronCommandInterface):
             return empty_list
 
         endpoint = self.endpoint(channel_id=self.integration.channel_id)
-        product_ids = [str(ps.product) for ps in product_stocks if
-                       not getattr(ps, "failed_reason_type", None)]
+        product_ids = []
+        for ps in product_stocks:
+            if not getattr(ps, "failed_reason_type", None):
+                if isinstance(ps.product, Product):
+                    product_ids.append(str(ps.product.pk))
+                else:
+                    product_ids.append(ps.product)
+
         prices = []
         for chunk in split_list(product_ids, self.CHUNK_SIZE):
             price_batch = self.get_prices(chunk, endpoint)
@@ -249,8 +255,12 @@ class GetProductPricesFromProductStocks(OmnitronCommandInterface):
             if getattr(product_stock, "failed_reason_type", None):
                 continue
             try:
-                product_stock.productprice = product_prices[
-                    product_stock.product]
+                if isinstance(product_stock.product, Product):
+                    product_stock.productprice = product_prices[
+                        product_stock.product.pk]
+                else:
+                    product_stock.productprice = product_prices[
+                        product_stock.product]
             except KeyError:
                 product_stock.failed_reason_type = FailedReasonType.channel_app.value
                 self.failed_object_list.append(
