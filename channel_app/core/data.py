@@ -253,3 +253,4 @@ class ChannelUpdateOrderItemDto:
     invoice_number: Optional[str] = None
     invoice_date: Optional[str] = None
     tracking_number: Optional[str] = None
+    extra_field: Optional[dict] = None
