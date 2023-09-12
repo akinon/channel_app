@@ -499,7 +499,7 @@ class GetCancellationRequest(OmnitronCommandInterface):
     def get_cancellation_requests(self, query_params={}) -> List[
             CancellationRequest]:
         endpoint = self.endpoint(channel_id=self.integration.channel_id)
-        cancellation_requests = endpoint.list(query_params)
+        cancellation_requests = endpoint.list(params=query_params)
         for batch in endpoint.iterator:
             if not batch:
                 break
