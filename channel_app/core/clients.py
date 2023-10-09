@@ -1,6 +1,6 @@
 from redis import Redis
 from omnisdk.omnitron.client import OmnitronApiClient as BaseOmnitronApiClient
-v
+
 
 class RedisClient(Redis):
     def __init__(self):
@@ -26,7 +26,8 @@ class OmnitronApiClient(BaseOmnitronApiClient):
 
     @property
     def token(self):
-        return self.redis_client.get(self.redis_prefix)
+        token = self.redis_client.get(self.redis_prefix)
+        return token.decode("utf-8") if token else self.refresh_key()
 
     def set_token(self, token):
         self.redis_client.set(self.redis_prefix, token)
