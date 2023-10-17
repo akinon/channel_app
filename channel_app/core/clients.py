@@ -27,7 +27,17 @@ class OmnitronApiClient(BaseOmnitronApiClient):
     @property
     def token(self):
         token = self.redis_client.get(self.redis_prefix)
-        return token.decode("utf-8") if token else self.refresh_key()
+        if token:
+            token = token.decode("utf-8")
+        else:
+            # Check redis key for retry count with max 3 attempts in 6 min.
+            retry_count = int(self.redis_client.get("retry_count") or 0)
+            if retry_count < 3:
+                token = self.refresh_key()
+                self.redis_client.set("retry_count", retry_count + 1, 360)
+            else:
+                raise Exception("Login attempts exceeded 3 times in 6 min.")
+        return token
 
     def set_token(self, token):
         self.redis_client.set(self.redis_prefix, token)
