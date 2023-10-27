@@ -1,4 +1,4 @@
-requests==2.26.0
+requests==2.31.0
 celery[redis]==5.2.3
 sentry_sdk==1.14.0
 flower==1.2.0
