@@ -103,6 +103,8 @@ class GetProductCategoryNodes(OmnitronCommandInterface):
         for product in products:
             product_categories = product_category_endpoint.list(
                 params={"product": product.pk})
+            for item in product_category_endpoint.iterator:
+                product_categories.extend(item)
             category_node_list = []
             for product_category in product_categories:
                 if not str(product_category.category["path"]).startswith(
