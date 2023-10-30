@@ -156,7 +156,7 @@ class TestOmnitronApiClient(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             self.client.token
         self.assertIn(
-            "Login attempts exceeded 3 times in 360 seconds.",
+            "Login attempts exceeded 3 times in 6 min.",
             str(context.exception)
         )
         self.assertEqual(
