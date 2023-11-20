@@ -226,7 +226,7 @@ class ProductService(object):
                 report: ErrorReportDto
                 data: BatchRequest
 
-                if report and not (is_success_log or report.is_ok):
+                if report and (is_success_log or not report.is_ok):
                     omnitron_integration.do_action(
                         key='create_error_report',
                         objects=report)
