@@ -238,7 +238,9 @@ class OmnitronCommandInterface(CommandInterface):
         return formatted_data
 
     def check_run(self, is_ok, formatted_data):
-        if is_ok and not formatted_data and self.is_batch_request:
+        if is_ok and not \
+            (formatted_data or self.failed_object_list) and \
+            self.is_batch_request:
             self.batch_service(self.integration.channel_id).to_done(
                 self.integration.batch_request)
             return False
