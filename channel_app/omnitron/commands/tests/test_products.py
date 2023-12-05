@@ -6,6 +6,7 @@ from omnisdk.omnitron.endpoints import (
 )
 from channel_app.core.tests import BaseTestCaseMixin
 from channel_app.omnitron.commands.products import (
+    GetDeletedProducts,
     GetInsertedProducts, 
     GetUpdatedProducts, 
     Product,
@@ -170,3 +171,77 @@ class TestGetUpdatedProducts(BaseTestCaseMixin):
     def test_get_integration_actions_without_product(self):
         products = self.get_updated_products.get_integration_actions([])
         self.assertEqual(products, [])
+
+
+class TestGetInsertedOrUpdatedProducts(
+    TestGetInsertedProducts, 
+    BaseTestCaseMixin
+):
+    """
+    Test case for GetInsertedOrUpdatedProducts
+    run: python -m unittest channel_app.omnitron.commands.tests.test_products.TestGetInsertedOrUpdatedProducts
+    """
+    def setUp(self) -> None:
+        self.get_inserted_products = GetInsertedProducts(
+            integration=self.mock_integration
+        )
+        self.get_inserted_products.path = "inserts_or_updates"
+        return super().setUp()
+    
+
+class TestGetDeletedProducts(BaseTestCaseMixin):
+    """
+    Test case for GetDeletedProducts
+    run: python -m unittest channel_app.omnitron.commands.tests.test_products.TestGetDeletedProducts
+    """
+
+    def setUp(self) -> None:
+        self.get_deleted_products = GetDeletedProducts(
+            integration=self.mock_integration
+        )
+        self.products = [
+            {
+                "pk": 23,
+                "channel": 3,
+                "content_type": {
+                    "id": 1,
+                    "app_label": "products",
+                    "model": "product"
+                },
+                "object_id": 1,
+                "remote_id": None,
+                "version_date": "2023-11-07T08:58:16.079727Z",
+                "state": {},
+                "modified_date": "2023-11-08T09:11:56.919937Z",
+                "local_batch_id": "7c43e5fb-32be-4a18-a6fa-539c9d2485ee",
+                "status": "processing",
+                "created_date": "2023-11-08T09:11:56.919929Z"
+            }
+        ]
+    
+    @patch.object(GetDeletedProducts, 'get_deleted_products_ia')
+    def test_get_data(self, mock_get_deleted_products_ia):
+        mock_get_deleted_products_ia.return_value = self.products
+        products = self.get_deleted_products.get_data()
+        self.assertEqual(len(products), 1)
+        
+        product = products[0]
+        self.assertEqual(product.get('pk'), 23)
+
+    @patch('channel_app.core.clients.OmnitronApiClient')
+    @patch.object(BaseClient, 'get_instance')
+    @patch.object(ChannelIntegrationActionEndpoint, '_list')
+    def test_get_deleted_products_ia(
+        self,
+        mock_list,
+        mock_get_instance, 
+        mock_omnitron_api_client
+    ):
+        example_response = MagicMock()
+        example_response.json.return_value = self.products
+        mock_list.return_value = example_response
+        products_ia = self.get_deleted_products.get_deleted_products_ia()
+        self.assertEqual(len(products_ia), 1)
+        
+        product = products_ia[0].get_parameters()
+        self.assertEqual(product.get('pk'), 23)
