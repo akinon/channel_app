@@ -67,3 +67,21 @@ Thumbs.db
 *.env
 
 docs/build/
+
+
+.vscode
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
