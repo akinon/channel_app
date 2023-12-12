@@ -15,12 +15,13 @@ class ProductService(object):
     batch_service = ClientBatchRequest
 
     def insert_products(self, add_mapped=True, add_stock=True, add_price=True,
-                        add_categories=True, is_sync=True,
-                        is_success_log=True):
+                        add_categories=True, is_sync=True, is_success_log=True):
         with OmnitronIntegration(
                 content_type=ContentType.product.value) as omnitron_integration:
             products = omnitron_integration.do_action(
                 key='get_inserted_products')
+            
+            first_product_count = len(products)
 
             if add_mapped:
                 products = products and omnitron_integration.do_action(
@@ -39,6 +40,12 @@ class ProductService(object):
                     key='get_product_categories', objects=products)
 
             if not products:
+                if first_product_count:
+                    omnitron_integration.batch_request.objects = None
+                    self.batch_service(omnitron_integration.channel_id).to_fail(
+                        omnitron_integration.batch_request
+                    )
+                    
                 return
 
             products: List[Product]
@@ -79,6 +86,9 @@ class ProductService(object):
                 content_type=ContentType.product.value) as omnitron_integration:
             products = omnitron_integration.do_action(
                 key='get_updated_products')
+            
+            first_product_count = len(products)
+
             if add_mapped:
                 products = products and omnitron_integration.do_action(
                     key='get_mapped_products', objects=products)
@@ -96,6 +106,12 @@ class ProductService(object):
                     key='get_product_categories', objects=products)
 
             if not products:
+                if first_product_count:
+                    omnitron_integration.batch_request.objects = None
+                    self.batch_service(omnitron_integration.channel_id).to_fail(
+                        omnitron_integration.batch_request
+                    )
+                    
                 return
 
             products: List[Product]
@@ -188,8 +204,8 @@ class ProductService(object):
 
             for batch_request in batch_request_data:
                 response_data, report, data = ChannelIntegration().do_action(
-                    key='check_deleted_products',
-                    objects=batch_request)
+                    key='check_deleted_products', objects=batch_request,
+                    batch_request=batch_request)
 
                 # tips
                 response_data: List[ProductBatchRequestResponseDto]
@@ -204,7 +220,7 @@ class ProductService(object):
                     omnitron_integration.batch_request = batch_request
                     omnitron_integration.do_action(
                         key='process_delete_product_batch_requests',
-                        objects=batch_request)
+                        objects=response_data)
 
     def get_product_batch_requests(self, is_success_log=True):
         with OmnitronIntegration(create_batch=False) as omnitron_integration:
@@ -218,14 +234,15 @@ class ProductService(object):
 
             for batch_request in batch_request_data:
                 response_data, report, data = ChannelIntegration().do_action(
-                    key='check_products', objects=batch_request)
+                    key='check_products', objects=batch_request,
+                    batch_request=batch_request)
 
                 # tips
                 response_data: List[ProductBatchRequestResponseDto]
                 report: ErrorReportDto
                 data: BatchRequest
 
-                if report and not (is_success_log or report.is_ok):
+                if report and (is_success_log or not report.is_ok):
                     omnitron_integration.do_action(
                         key='create_error_report',
                         objects=report)
