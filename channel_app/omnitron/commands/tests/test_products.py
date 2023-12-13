@@ -249,7 +249,6 @@ class TestGetDeletedProducts(BaseTestCaseMixin):
         product = products_ia[0].get_parameters()
         self.assertEqual(product.get('pk'), 23)
 
-
 class TestGetMappedProducts(BaseTestCaseMixin):
     """
     Test case for GetMappedProducts
@@ -492,3 +491,4 @@ class TestGetProductPrices(BaseTestCaseMixin):
         mock_get_prices.return_value = price_list
         result = self.get_product_prices.get_product_price(products)
         self.assertFalse(hasattr(result[-1], 'productprice'))
+
