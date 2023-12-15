@@ -67,3 +67,6 @@ Thumbs.db
 *.env
 
 docs/build/
+
+.coverage
+.vscode
