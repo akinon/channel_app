@@ -260,7 +260,7 @@ class TestGetDeletedProducts(BaseTestCaseMixin):
         
         product = products_ia[0].get_parameters()
         self.assertEqual(product.get('pk'), 23)
-        
+
         
 class TestGetMappedProducts(BaseTestCaseMixin):
     """
