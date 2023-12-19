@@ -4,12 +4,15 @@ from omnisdk.omnitron.endpoints import (
     ChannelIntegrationActionEndpoint,
     ChannelProductEndpoint, 
 )
+from omnisdk.omnitron.models import ChannelAttributeConfig
+
+from channel_app.core.commands import OmnitronCommandInterface
 from channel_app.core.tests import BaseTestCaseMixin
 from channel_app.omnitron.commands.products import (
     GetDeletedProducts,
-    GetInsertedProducts, 
-    GetUpdatedProducts, 
-    Product,
+    GetInsertedProducts,
+    GetUpdatedProducts,
+    Product, GetMappedProducts, GetProductPrices,
 )
 from channel_app.omnitron.constants import BatchRequestStatus
 
@@ -245,3 +248,247 @@ class TestGetDeletedProducts(BaseTestCaseMixin):
         
         product = products_ia[0].get_parameters()
         self.assertEqual(product.get('pk'), 23)
+
+        
+class TestGetMappedProducts(BaseTestCaseMixin):
+    """
+    Test case for GetMappedProducts
+    run: python -m unittest channel_app.omnitron.commands.tests.test_products.TestGetMappedProducts
+    """
+
+    def setUp(self) -> None:
+        self.get_mapped_products = GetMappedProducts(
+            integration=self.mock_integration
+        )
+        self.sample_products = [
+            Product(
+                pk=1,
+                name='test',
+                failed_reason_type=None,
+                modified_date='2021-01-01T00:00:00Z'
+            ),
+            Product(
+                pk=2,
+                name='test2',
+                failed_reason_type='error',
+                modified_date='2021-01-01T00:00:00Z'
+            )
+        ]
+
+    @patch.object(GetMappedProducts, 'get_mapping')
+    def test_get_data(self, mock_get_mapping):
+        mock_get_mapping.return_value = self.sample_products
+        result = self.get_mapped_products.get_data()
+        self.assertEqual(len(result), 2)
+
+    @patch.object(GetMappedProducts, 'check_product')
+    def test_validated_data(self, mock_check_product):
+        data = self.sample_products
+        self.get_mapped_products.validated_data(data)
+        self.assertEqual(mock_check_product.call_count, 2)
+
+    @patch.object(GetMappedProducts, 'get_attribute_config_list')
+    @patch.object(GetMappedProducts, 'update_and_check_product')
+    def test_check_product_gets_attribute_config_list(
+        self,
+        mock_update_and_check_product,
+        mock_get_attribute_config_list
+    ):
+        product = Product()
+        product.mapped_attributes = MagicMock()
+        product.mapped_attributes.attribute_set_id = 1
+        product.mapped_attributes.mapped_attribute_values = {
+            "1": {
+                "value": "test"
+            }
+        }
+        mock_get_attribute_config_list.return_value = [
+            ChannelAttributeConfig()
+        ]
+        self.get_mapped_products.check_product(
+            product,
+            {}
+        )
+        mock_get_attribute_config_list.assert_called_once()
+
+    @patch.object(GetMappedProducts, 'check_attribute_value_defined')
+    @patch.object(GetMappedProducts, 'check_required')
+    def test_update_and_check_product_checks_attribute_value_and_required(
+        self,
+        mock_check_required,
+        mock_check_attribute_value_defined
+    ):
+        product = Product()
+        product.mapped_attributes = MagicMock()
+        product.mapped_attributes.mapped_attribute_values = {}
+        config = ChannelAttributeConfig()
+        config.attribute_remote_id = 1
+        config.is_required = True
+        config.is_variant = True
+        config.is_custom = True
+        config.is_meta = True
+        config.attribute = {
+            "pk": 1,
+            "name": "test",
+        }
+        result = self.get_mapped_products.update_and_check_product(
+            config,
+            product
+        )
+        self.assertFalse(result)
+
+    @patch.object(GetMappedProducts, 'check_attribute_value_defined')
+    @patch.object(GetMappedProducts, 'check_required')
+    def test_update_and_check_product(
+            self,
+            mock_check_required,
+            mock_check_attribute_value_defined
+    ):
+        product = Product()
+        product.mapped_attributes = MagicMock()
+        product.mapped_attributes.mapped_attribute_values = {
+            "1": {
+                "value": "test"
+            }
+        }
+        config = ChannelAttributeConfig()
+        config.attribute_remote_id = 1
+        config.is_required = True
+        config.is_variant = True
+        config.is_custom = True
+        config.is_meta = True
+        config.attribute = {
+            "pk": 1,
+            "name": "test",
+        }
+        result = self.get_mapped_products.update_and_check_product(
+            config,
+            product
+        )
+        self.assertTrue(result)
+
+    @patch.object(GetMappedProducts, 'get_attribute_config_list')
+    def test_get_attribute_config_list_returns_configs_data(
+        self,
+        mock_get_attribute_config_list
+    ):
+        config = ChannelAttributeConfig()
+        mock_get_attribute_config_list.return_value = [
+            config
+        ]
+        result = self.get_mapped_products.get_attribute_config_list(
+            {"attribute_set": 1, "limit": 10}
+        )
+        self.assertEqual(result, [config])
+
+    def test_check_attribute_value_defined_raises_exception_when_mapped_value_not_defined(self):
+        mapped_attributes_obj = MagicMock()
+        mapped_attributes_obj.mapped_attributes = {"name": "value"}
+        mapped_attributes_obj.mapped_attribute_values = {}
+        config = ChannelAttributeConfig()
+        config.attribute = {"pk": 1, "name": "name"}
+        config.attribute_set = {"pk": 1, "name": "name"}
+        config.is_custom = False
+        with self.assertRaises(Exception):
+            self.get_mapped_products.check_attribute_value_defined(
+                config,
+                mapped_attributes_obj
+            )
+
+    def test_check_required_raises_exception_when_required_attribute_missing(self):
+        product = Product()
+        product.sku = "sku"
+        self.get_mapped_products.integration = MagicMock()
+        self.get_mapped_products.integration.channel_id = 1
+        mapped_attributes = {}
+        config = ChannelAttributeConfig()
+        config.attribute = {"name": "name"}
+        config.is_required = True
+        with self.assertRaises(Exception):
+            self.get_mapped_products.check_required(
+                product,
+                config,
+                mapped_attributes
+            )
+
+    @patch.object(GetMappedProducts, 'get_mapping')
+    def test_get_mapping_returns_mapped_products(self, mock_get_mapping):
+        product = Product()
+        mock_get_mapping.return_value = [product]
+        result = self.get_mapped_products.get_mapping([product])
+        self.assertEqual(result, [product])
+
+    @patch.object(GetMappedProducts, 'get_mapping')
+    def test_get_mapping_returns_empty_list_when_no_products(self, mock_get_mapping):
+        mock_get_mapping.return_value = []
+        result = self.get_mapped_products.get_mapping([])
+        self.assertEqual(result, [])
+
+
+class TestGetMappedProductsWithOutCommit(TestGetMappedProducts):
+    pass
+
+
+class TestGetProductPrices(BaseTestCaseMixin):
+    """
+    Test case for GetProductPrices
+    run: python -m unittest channel_app.omnitron.commands.tests.test_products.TestGetProductPrices
+    """
+
+    def setUp(self) -> None:
+        self.get_product_prices = GetProductPrices(
+            integration=self.mock_integration
+        )
+
+    @patch.object(BaseClient, 'get_instance')
+    @patch.object(GetProductPrices, 'get_prices')
+    def test_successful_product_price_retrieval(
+        self,
+        mock_get_instance,
+        mock_get_prices
+    ):
+        products = [Product(pk=i, productprice=10) for i in range(1, 6)]
+        self.get_product_prices.objects = products
+
+        result = self.get_product_prices.get_data()
+        self.assertEqual(result, products)
+
+    @patch.object(GetProductPrices, 'get_prices')
+    @patch.object(BaseClient, 'get_instance')
+    def test_product_price_retrieval_with_successful_get_product_price(
+        self,
+        mock_get_instance,
+        mock_get_prices
+    ):
+        products = [Product(pk=i) for i in range(1, 6)]
+
+        price_list = []
+        for product in products:
+            price = MagicMock()
+            price.product = product.pk
+            price_list.append(price)
+
+        mock_get_prices.return_value = price_list
+        result = self.get_product_prices.get_product_price(products)
+        self.assertEqual(result, products)
+
+    @patch.object(GetProductPrices, 'get_prices')
+    @patch.object(BaseClient, 'get_instance')
+    def test_product_price_retrieval_with_failed_get_product_price(
+            self,
+            mock_get_instance,
+            mock_get_prices
+    ):
+        products = [Product(pk=i, product_price=0) for i in range(1, 6)]
+
+        price_list = []
+        for product in products:
+            price = MagicMock()
+            price.product = product.pk
+
+            if len(price_list) < len(products) - 1:
+                price_list.append(price)
+
+        mock_get_prices.return_value = price_list
+        result = self.get_product_prices.get_product_price(products)
+        self.assertFalse(hasattr(result[-1], 'productprice'))

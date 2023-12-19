@@ -1,0 +1,6 @@
+{
+    // Line 0 to 79 draw a ruler
+    "editor.rulers": [
+        79
+    ],
+}
