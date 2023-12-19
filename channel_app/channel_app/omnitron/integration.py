@@ -1,4 +1,4 @@
-from omnisdk.omnitron.client import OmnitronApiClient
+from channel_app.core.clients import OmnitronApiClient
 
 from channel_app.core.integration import BaseIntegration
 from channel_app.omnitron.batch_request import ClientBatchRequest
@@ -20,15 +20,23 @@ from channel_app.omnitron.commands.orders.orders import (
     CreateOrderShippingInfo,
     GetOrders,
     ProcessOrderBatchRequests,
-    CreateOrderCancel, GetCancellationRequest)
+    CreateOrderCancel,
+    GetCancellationRequest,
+    GetOrderItems,
+    GetOrderItemsWithOrder, UpdateOrderItems)
+from channel_app.omnitron.commands.product_images import (
+    GetUpdatedProductImages, GetInsertedProductImages,
+    ProcessImageBatchRequests)
 from channel_app.omnitron.commands.product_prices import (
     GetUpdatedProductPrices, ProcessPriceBatchRequests,
     GetInsertedProductPrices, GetInsertedProductPricesFromExtraPriceList,
-    GetUpdatedProductPricesFromExtraPriceList)
+    GetUpdatedProductPricesFromExtraPriceList,
+    GetProductStocksFromProductPrices)
 from channel_app.omnitron.commands.product_stocks import (
     GetUpdatedProductStocks, ProcessStockBatchRequests,
     GetInsertedProductStocks, GetUpdatedProductStocksFromExtraStockList,
-    GetInsertedProductStocksFromExtraStockList)
+    GetInsertedProductStocksFromExtraStockList,
+    GetProductPricesFromProductStocks)
 from channel_app.omnitron.commands.products import (
     GetInsertedProducts,
     GetUpdatedProducts,
@@ -41,7 +49,8 @@ from channel_app.omnitron.commands.products import (
     GetInsertedOrUpdatedProducts,
     GetProductCategoryNodes, GetProductObjects, GetProductsFromBatchrequest,
     GetProductPricesWithOutCommit, GetProductStocksWithOutCommit,
-    GetMappedProductsWithOutCommit)
+    GetMappedProductsWithOutCommit,
+    GetProductCategoryNodesWithIntegrationAction)
 from channel_app.omnitron.commands.setup import (
     CreateOrUpdateCategoryTreeAndNodes, CreateOrUpdateCategoryAttributes,
     GetCategoryIds, CreateOrUpdateChannelAttributeSet,
@@ -71,18 +80,24 @@ class OmnitronIntegration(BaseIntegration):
         "get_product_stocks": GetProductStocks,
         "get_product_stocks_without_commit": GetProductStocksWithOutCommit,
         "get_product_categories": GetProductCategoryNodes,
+        "get_product_categories_with_integration_action": GetProductCategoryNodesWithIntegrationAction,
         "get_batch_requests": GetBatchRequests,
         "get_updated_stocks": GetUpdatedProductStocks,
         "get_inserted_stocks": GetInsertedProductStocks,
         "get_updated_stocks_from_extra_stock_list": GetUpdatedProductStocksFromExtraStockList,
+        "get_prices_from_product_stocks": GetProductPricesFromProductStocks,
+        "get_stocks_from_product_prices": GetProductStocksFromProductPrices,
         "get_inserted_stocks_from_extra_stock_list": GetInsertedProductStocksFromExtraStockList,
         "get_updated_prices": GetUpdatedProductPrices,
         "get_inserted_prices": GetInsertedProductPrices,
         "get_inserted_prices_from_extra_price_list": GetInsertedProductPricesFromExtraPriceList,
         "get_updated_prices_from_extra_price_list": GetUpdatedProductPricesFromExtraPriceList,
+        "get_updated_images": GetUpdatedProductImages,
+        "get_inserted_images": GetInsertedProductImages,
         "process_product_batch_requests": ProcessProductBatchRequests,
         "process_stock_batch_requests": ProcessStockBatchRequests,
         "process_price_batch_requests": ProcessPriceBatchRequests,
+        "process_image_batch_requests": ProcessImageBatchRequests,
         "process_order_batch_requests": ProcessOrderBatchRequests,
         "process_delete_product_batch_requests": ProcessDeletedProductBatchRequests,
         "get_or_create_customer": GetOrCreateCustomer,
@@ -90,6 +105,8 @@ class OmnitronIntegration(BaseIntegration):
         "get_cargo_company": GetCargoCompany,
         "create_order": CreateOrders,
         "get_orders": GetOrders,
+        "get_order_items": GetOrderItems,
+        "get_order_items_with_order": GetOrderItemsWithOrder,
         "create_order_shipping_info": CreateOrderShippingInfo,
         "create_or_update_category_tree_and_nodes": CreateOrUpdateCategoryTreeAndNodes,
         "create_or_update_category_attributes": CreateOrUpdateCategoryAttributes,
@@ -118,6 +135,7 @@ class OmnitronIntegration(BaseIntegration):
         "get_product_objects": GetProductObjects,
         "get_product_from_batch_request": GetProductsFromBatchrequest,
         "get_cancellation_requests": GetCancellationRequest,
+        "update_order_items": UpdateOrderItems
         # "fetch_cancellation_plan": FetchCancellationPlan
     }
 

@@ -526,7 +526,8 @@ class GetChannelAttributeSets(OmnitronCommandInterface):
         endpoint = ChannelAttributeSetEndpoint(
             channel_id=self.integration.channel_id)
         attribute_sets = endpoint.list(
-            params={"channel": self.integration.channel_id})
+            params={"channel": self.integration.channel_id,
+                    "sort": "id"})
         for attribute_set_batch in endpoint.iterator:
             attribute_sets.extend(attribute_set_batch)
         return attribute_sets
@@ -546,7 +547,8 @@ class GetChannelAttributeSetConfigs(OmnitronCommandInterface):
             channel_id=self.integration.channel_id)
         attribute_set_configs = endpoint.list(params={
             "content_type__model": ContentType.category_node.value,
-            "limit": self.CHUNK_SIZE})
+            "limit": self.CHUNK_SIZE,
+            "sort": "object_id"})
         for attribute_set_config_batch in endpoint.iterator:
             attribute_set_configs.extend(attribute_set_config_batch)
         attribute_set_configs_by_category_node_pk = {}

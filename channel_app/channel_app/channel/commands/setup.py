@@ -7,7 +7,9 @@ from channel_app.core.data import (CategoryTreeDto, CategoryNodeDto,
                                    CategoryDto,
                                    CategoryAttributeDto,
                                    CategoryAttributeValueDto, ErrorReportDto,
-                                   ChannelConfSchemaField)
+                                   ChannelConfSchemaField, AttributeDto,
+                                   AttributeValueDto)
+from channel_app.core.utilities import mock_response_decorator
 from channel_app.omnitron.constants import ChannelConfSchemaDataTypes
 
 
@@ -42,8 +44,8 @@ class GetCategoryTreeAndNodes(ChannelCommandInterface):
     def transform_data(self, data) -> object:
         return data
 
-    def send_request(self, validated_data) -> object:
-        response = self.__mocked_request(data=validated_data)
+    def send_request(self, transformed_data) -> object:
+        response = self.__mocked_request(data=transformed_data)
         return response
 
     def normalize_response(self, data, validated_data, transformed_data,
@@ -61,7 +63,7 @@ class GetCategoryTreeAndNodes(ChannelCommandInterface):
             "id": None,
             "name": "root",
             "parentId": None,
-            "subCategories": response["categories"]
+            "subCategories": response.json()["categories"]
         }
         # TODO document parent of top level nodes should be None
         # TODO document id and parent_id of root node must be None
@@ -92,6 +94,7 @@ class GetCategoryTreeAndNodes(ChannelCommandInterface):
 
         return category_tree, report, data
 
+    @mock_response_decorator
     def __mocked_request(self, data):
         """
         Mock a request and response for the send operation to mimic actual channel data
@@ -170,8 +173,8 @@ class GetCategoryAttributes(ChannelCommandInterface):
     def transform_data(self, data) -> object:
         return data
 
-    def send_request(self, validated_data) -> object:
-        response = self.__mocked_request(data=validated_data)
+    def send_request(self, transformed_data) -> object:
+        response = self.__mocked_request(data=transformed_data)
         return response
 
     def normalize_response(self, data, validated_data, transformed_data,
@@ -181,7 +184,7 @@ class GetCategoryAttributes(ChannelCommandInterface):
         requires
         """
         report = self.create_report(response)
-
+        response = response.json()
         category = CategoryDto(remote_id=response["id"],
                                name=response["name"],
                                attributes=[])
@@ -203,13 +206,13 @@ class GetCategoryAttributes(ChannelCommandInterface):
             category.attributes.append(attribute)
         return category, report, data
 
+    @mock_response_decorator
     def __mocked_request(self, data):
         """
         Mock a request and response for the send operation to mimic actual channel data
         """
-
         return {
-            "id": data.remote_id,
+            "id": 123123124214,
             "name": "Sweatshirt",
             "displayName": "Sweatshirt",
             "categoryAttributes": [
@@ -911,6 +914,66 @@ class GetCategoryAttributes(ChannelCommandInterface):
                     "slicer": False
                 }]
         }
+
+
+class GetAttributes(ChannelCommandInterface):
+    """
+    It is the class that enables the creation of attribute and attribute values
+    without depending on category.
+    """
+
+    def get_data(self):
+        data = self.objects
+        return data
+
+    def validated_data(self, data) -> object:
+        return data
+
+    def transform_data(self, data) -> object:
+        return data
+
+    def send_request(self, transformed_data) -> object:
+        response = self.__mocked_request(data=transformed_data)
+        return response
+
+    def normalize_response(self, data, validated_data, transformed_data,
+                           response) -> Tuple[
+        List[AttributeDto], ErrorReportDto, Any]:
+        """
+        It is the method where the response
+        from the Channel is processed and
+        AttributeDto and AttributeValueDto are created.
+        """
+        report = self.create_report(response)
+
+        response = response.json()
+        attributes = []
+        for attribute in response:
+            attr = AttributeDto(remote_id=attribute["id"],
+                                name=attribute["name"],
+                                values=[])
+            for attribute_value in attribute["attr_values"]:
+                attr.values.append(
+                    AttributeValueDto(remote_id=attribute_value["id"],
+                                      name=attribute_value["name"]))
+            attributes.append(attr)
+
+        return attributes, report, data
+
+    @mock_response_decorator
+    def __mocked_request(self, data):
+        """
+        Mock a request and response for the send operation to mimic actual channel data
+        """
+
+        return [{
+            "id": 123213,
+            "name": "Color",
+            "attr_values": [{"id": 213124,
+                             "name": "Green"},
+                            {"id": 21442,
+                             "name": "Red"}]
+        }]
 
 
 class GetChannelConfSchema(ChannelCommandInterface):
