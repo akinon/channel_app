@@ -1,4 +1,7 @@
-from channel_app.core.data import CategoryTreeDto, ErrorReportDto
+from typing import List
+
+from channel_app.core import settings
+from channel_app.core.data import CategoryTreeDto, ErrorReportDto, AttributeDto
 from channel_app.core.settings import OmnitronIntegration, ChannelIntegration
 from channel_app.omnitron.constants import ContentType
 
@@ -45,9 +48,47 @@ class SetupService(object):
                         key='create_error_report',
                         objects=report)
 
+                category = category if category.attributes else None
                 omnitron_integration.do_action(
                     key='create_or_update_category_attributes',
-                    objects=category)
+                    objects=(category_ia, category))
+
+    def create_or_update_attributes(self, is_success_log=False):
+        with OmnitronIntegration(
+                content_type=ContentType.attribute.value) as omnitron_integration:
+            channel_integration = ChannelIntegration()
+            attributes, report, data = channel_integration.do_action(
+                key='get_attributes',
+                batch_request=omnitron_integration.batch_request
+            )
+
+            attributes: List[AttributeDto]
+            reports: ErrorReportDto
+
+            if report and (is_success_log or not report.is_ok):
+                omnitron_integration.do_action(
+                    key='create_error_report',
+                    objects=report)
+
+            for attribute in attributes:
+                attr = omnitron_integration.do_action(
+                    key="create_or_update_channel_attribute",
+                    objects={"name": attribute.name,
+                             "remote_id": attribute.remote_id},
+                )[0]
+
+                omnitron_integration.do_action(
+                    key="get_or_create_channel_attribute_schema",
+                    objects={"name": f"{settings.OMNITRON_CHANNEL_ID} {attribute.name} Schema"},
+                )
+                for attr_value in attribute.values:
+                    omnitron_integration.do_action(
+                        key="create_or_update_channel_attribute_value",
+                        objects={
+                            "attribute": attr.pk,
+                            "label": attr_value.name,
+                            "value": attr_value.remote_id,
+                            "remote_id": attr_value.remote_id})
 
     def update_channel_conf_schema(self):
         with OmnitronIntegration(

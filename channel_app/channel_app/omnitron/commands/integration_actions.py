@@ -75,6 +75,7 @@ class GetIntegrationActionsWithObjectId(OmnitronCommandInterface):
                 chunk_ia = self.endpoint(
                     channel_id=self.integration.channel_id
                 ).list(params={
+                    "limit": len(chunk_pk_list),
                     "channel_id": self.integration.channel_id,
                     "content_type_name": ct,
                     self.id_type: ",".join([str(pk) for pk in chunk_pk_list])
@@ -128,6 +129,7 @@ class GetIntegrationActions(OmnitronCommandInterface):
             channel_id=self.integration.channel_id)
         self.objects.update({
             "channel_id": self.integration.channel_id,
+            "sort": "id"
         })
         integration_action_list = integration_action_endpoint.list(
             params=self.objects)

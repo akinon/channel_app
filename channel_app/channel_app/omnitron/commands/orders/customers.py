@@ -22,6 +22,7 @@ class GetOrCreateCustomer(OmnitronCommandInterface):
         if customer_identifier_field == CustomerIdentifierField.email:
             customers = self.endpoint(channel_id=self.integration.channel_id).list(params={
                 "email": data.email,
+                "channel": self.integration.channel_id
             })
             for c in customers:
                 if c.email != data.email:
@@ -30,6 +31,7 @@ class GetOrCreateCustomer(OmnitronCommandInterface):
             # TODO phone_number filter does not exist on customerfilter
             customers = self.endpoint(channel_id=self.integration.channel_id).list(params={
                 "phone_number": data.phone_number,
+                "channel": self.integration.channel_id
             })
             for c in customers:
                 if c.phone_number != data.phone_number:
@@ -52,7 +54,7 @@ class GetOrCreateCustomer(OmnitronCommandInterface):
                 new_customer.first_name = data.first_name
             if "last_name" in asdict(data) and data.last_name != customer.last_name:
                 must_update = True
-                new_customer.first_name = data.last_name
+                new_customer.last_name = data.last_name
             if must_update:
                 customer = self.endpoint(channel_id=self.integration.channel_id).update(
                     id=customer.pk, item=customer)
