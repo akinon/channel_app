@@ -37,6 +37,19 @@ class CategoryAttributeDto:
 
 
 @dataclass
+class AttributeValueDto:
+    remote_id: str
+    name: str
+
+
+@dataclass
+class AttributeDto:
+    remote_id: str
+    name: str
+    values: List[AttributeValueDto]
+
+
+@dataclass
 class CategoryDto:
     remote_id: str
     name: str
@@ -124,7 +137,7 @@ class OmnitronOrderDto:
     extra_field: dict
     cargo_company: int
     created_at: datetime.datetime
-    delivery_type: Optional[str] = ""
+    delivery_type: Optional[str] = None
     discount_amount: Optional[Decimal] = "0.0"
     net_shipping_amount: Optional[Decimal] = "0.0"
     tracking_number: Optional[str] = None
@@ -135,7 +148,7 @@ class OmnitronOrderDto:
     client_type: Optional[str] = ""
     language_code: Optional[str] = ""
     notes: Optional[str] = ""
-    delivery_range: Optional[str] = ""
+    delivery_range: Optional[str] = None
     shipping_option_slug: Optional[str] = ""
     status: Optional[str] = ""
 
@@ -152,6 +165,8 @@ class OrderItemDto:
     price_list: Optional[int] = None
     stock_list: Optional[int] = None
     tracking_number: Optional[str] = None
+    invoice_number: Optional[str] = None
+    invoice_date: Optional[str] = None
     carrier_shipping_code: Optional[str] = ""
     discount_amount: Optional[Decimal] = 0.0
     retail_price: Optional[Decimal] = 0.0
@@ -175,6 +190,7 @@ class CancelOrderDto:
     cancel_items: List[str]  # order_item_remote_id list
     reasons: dict  # order_item_remote_id : reason code
     is_cargo_refund: Optional[bool] = False  # default False
+    forced_refund_amount: Optional[bool] = None  # default False
     refund_invoice_number: Optional[str] = None
 
 
@@ -211,6 +227,7 @@ class AddressDto:
     identity_number: Optional[str] = None  # null
     extra_field: Optional[dict] = None  # {}
     is_active: Optional[bool] = True  # true
+    retail_store: Optional[str] = None
 
 
 @dataclass
@@ -225,3 +242,15 @@ class ChannelOrderDto(OmnitronOrderDto):
 class ChannelCreateOrderDto:
     order: ChannelOrderDto
     order_item: List[OrderItemDto]
+
+
+@dataclass
+class ChannelUpdateOrderItemDto:
+    remote_id: str
+    order_remote_id: Optional[str] = None
+    order_number: Optional[str] = None
+    status: Optional[str] = None
+    invoice_number: Optional[str] = None
+    invoice_date: Optional[str] = None
+    tracking_number: Optional[str] = None
+    extra_field: Optional[dict] = None
