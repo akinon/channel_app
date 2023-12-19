@@ -870,3 +870,4 @@ class TestGetProductCategoryNodesWithIntegrationAction(TestGetProductCategoryNod
             )
 
         self.assertEqual(len(result), 2)
+
