@@ -1,3 +1,4 @@
+from dataclasses import asdict
 from typing import List
 
 from omnisdk.omnitron.endpoints import (ChannelCreateOrderEndpoint,
@@ -19,6 +20,7 @@ from channel_app.core.utilities import split_list
 from channel_app.omnitron.batch_request import ClientBatchRequest
 from channel_app.omnitron.commands.batch_requests import ProcessBatchRequests
 from channel_app.omnitron.constants import (ContentType, BatchRequestStatus)
+from channel_app.omnitron.exceptions import OrderException
 
 
 class GetOrders(OmnitronCommandInterface):
@@ -61,6 +63,28 @@ class GetOrderItems(OmnitronCommandInterface):
                                    objects=order_items)
         return order_items
 
+    def get_order_items(self, order):
+        params = {"order": order.pk, "sort": "id"}
+        endpoint = self.endpoint(channel_id=self.integration.channel_id)
+        order_items = endpoint.list(params=params)
+        for item in endpoint.iterator:
+            if not item:
+                break
+            order_items.extend(item)
+        return order_items
+
+
+class GetOrderItemsWithOrder(GetOrderItems):
+    endpoint = ChannelOrderItemEndpoint
+
+    def get_data(self):
+        orders = self.objects
+        for order in orders:
+            order_items = self.get_order_items(order)
+            order.orderitem_set = order_items
+
+        return orders
+
 
 class ProcessOrderBatchRequests(OmnitronCommandInterface, ProcessBatchRequests):
     """
@@ -82,7 +106,7 @@ class ProcessOrderBatchRequests(OmnitronCommandInterface, ProcessBatchRequests):
 
     @property
     def update_state(self, *args, **kwargs) -> BatchRequestStatus:
-        return BatchRequestStatus.done
+        return BatchRequestStatus.commit
 
     def get_remote_order_number(self, obj, integration_actions):
         for integration_action in integration_actions:
@@ -97,10 +121,10 @@ class ProcessOrderBatchRequests(OmnitronCommandInterface, ProcessBatchRequests):
                                                   integration_actions):
         channel_items_by_order_id = {}
         for order_id, order in model_items_by_content["order"].items():
+            number = self.get_remote_order_number(
+                obj=order, integration_actions=integration_actions)
             for channel_item in channel_response:
                 # TODO: comment
-                number = self.get_remote_order_number(obj=order,
-                                                      integration_actions=integration_actions)
                 if channel_item.number != number:
                     continue
                 remote_item = channel_item
@@ -117,7 +141,7 @@ class ProcessOrderBatchRequests(OmnitronCommandInterface, ProcessBatchRequests):
         orders = []
         for chunk_id_list in split_list(id_list, self.CHUNK_SIZE):
             orders_batch = end_point.list(
-                params={"id__in": ",".join(chunk_id_list),
+                params={"pk__in": ",".join(chunk_id_list),
                         "limit": len(chunk_id_list)})
             orders.extend(orders_batch)
         return {order.pk: order for order in orders}
@@ -148,6 +172,7 @@ class CreateOrders(OmnitronCommandInterface):
             "order_item": order_items,
             "order": {
                 "number": order.number[:128],
+                "status": order.status,
                 "channel": self.integration.channel_id,
                 "customer": order.customer,
                 "shipping_address": order.shipping_address,
@@ -161,15 +186,17 @@ class CreateOrders(OmnitronCommandInterface):
                 "cargo_company": order.cargo_company,
                 "discount_amount": order.discount_amount or 0,
                 "net_shipping_amount": order.net_shipping_amount,
-                "tracking_number": order.tracking_number[:256],
-                "carrier_shipping_code": order.carrier_shipping_code[:256],
+                "tracking_number": (order.tracking_number and
+                                    order.tracking_number[:256]),
+                "carrier_shipping_code": (order.carrier_shipping_code and
+                                          order.carrier_shipping_code[:256]),
                 "remote_addr": order.remote_addr,
                 "has_gift_box": order.has_gift_box,
                 "gift_box_note": order.gift_box_note[:160],
                 "client_type": "default",
                 "language_code": order.language_code,
                 "notes": order.notes[:320],
-                "delivery_range": order.delivery_type,
+                "delivery_range": order.delivery_range,
                 "shipping_option_slug": order.shipping_option_slug[:128],
                 "date_placed": str(order.created_at)
             }
@@ -184,8 +211,27 @@ class CreateOrders(OmnitronCommandInterface):
 
     def send(self, validated_data) -> object:
         order_obj = Order(**validated_data)
-        order = self.endpoint(channel_id=self.integration.channel_id).create(
-            item=order_obj)
+        order_endpoint = ChannelOrderEndpoint
+        try:
+            order_number = order_obj.order.get("number")
+            is_order_exists = order_endpoint(
+                channel_id=self.integration.channel_id
+            ).list(
+                params={
+                    "number": order_number,
+                    "channel_id": self.integration.channel_id
+                    }
+            )
+            if is_order_exists:
+                raise OrderException(params="Order Already Exist On Omnitron")
+
+        except OrderException:
+            return is_order_exists
+
+        order = self.endpoint(
+            channel_id=self.integration.channel_id
+        ).create(item=order_obj)
+
         self._update_batch_request(order)
         return order
 
@@ -208,7 +254,7 @@ class CreateOrders(OmnitronCommandInterface):
         self.update_batch_request(objects_data=objects_data)
 
     def get_order_items(self, order_pk):
-        params = {"order": order_pk}
+        params = {"order": order_pk, "sort": "id"}
         endpoint = ChannelOrderItemEndpoint(
             channel_id=self.integration.channel_id)
         order_items = endpoint.list(params=params)
@@ -220,7 +266,7 @@ class CreateOrders(OmnitronCommandInterface):
 
     @property
     def update_state(self, *args, **kwargs) -> BatchRequestStatus:
-        return BatchRequestStatus.done
+        return BatchRequestStatus.commit
 
     def prepare_order_items(self, order_items: List[OrderItemDto]):
         product_dict = self.get_products(order_items)
@@ -234,9 +280,7 @@ class CreateOrders(OmnitronCommandInterface):
                 "price_currency": item.price_currency,
                 "price": item.price,
                 "tax_rate": item.tax_rate,
-                "extra_field": {
-                    "id": item.remote_id
-                },
+                "extra_field": self.get_order_item_extra_field(item),
                 "price_list": item.price_list or price_list,
                 "stock_list": item.stock_list or stock_list,
                 "tracking_number": item.tracking_number,
@@ -265,16 +309,28 @@ class CreateOrders(OmnitronCommandInterface):
         product_integration_actions = []
         for chunk in split_list(product_remote_ids, self.CHUNK_SIZE):
             params = {"channel": self.integration.channel_id,
-                      "content_type_model": ContentType.product.value,
-                      "remote_id__in": ",".join(chunk)}
+                      "content_type_name": ContentType.product.value,
+                      "remote_id__in": ",".join(chunk),
+                      "sort": "id"}
             ia = endpoint.list(params=params)
+            for item in endpoint.iterator:
+                if not item:
+                    break
+                ia.extend(item)
+
             product_integration_actions.extend(ia)
+
         return {ia.remote_id: ia.object_id for ia in
                 product_integration_actions}
 
     def get_product_remote_id_list(self, order_items: List[OrderItemDto]):
-        product_remote_ids = [item.product for item in order_items]
+        product_remote_ids = list(set(item.product for item in order_items))
         return product_remote_ids
+
+    def check_run(self, is_ok, formatted_data):
+        if is_ok and formatted_data and self.is_batch_request:
+            return True
+        return False
 
 
 class CreateOrderShippingInfo(OmnitronCommandInterface):
@@ -335,7 +391,8 @@ class CreateOrderCancel(OmnitronCommandInterface):
         data = {
             "cancel_items": order_item_pk_list,
             "order": order_pk,
-            "reasons": reasons
+            "reasons": reasons,
+            "forced_refund_amount": cancel_data.forced_refund_amount
         }
         return data
 
@@ -343,7 +400,7 @@ class CreateOrderCancel(OmnitronCommandInterface):
         end_point = ChannelIntegrationActionEndpoint(
             channel_id=self.integration.channel_id)
         params = {"channel": self.integration.channel_id,
-                  "content_type_model": ContentType.order.value,
+                  "content_type_name": ContentType.order.value,
                   "remote_id": order_remote_id}
         integration_actions = end_point.list(params=params)
         if not integration_actions:
@@ -372,8 +429,9 @@ class CreateOrderCancel(OmnitronCommandInterface):
         object_ids = {}
         for order_item_remote_id in cancel_items:
             params = {"channel": self.integration.channel_id,
-                      "content_type_model": ContentType.order_item.value,
-                      "remote_id": order_item_remote_id}
+                      "content_type_name": ContentType.order_item.value,
+                      "remote_id": order_item_remote_id,
+                      "sort": "id"}
             integration_actions = end_point.list(params=params)
             for item in end_point.iterator:
                 if not item:
@@ -412,7 +470,7 @@ class CreateOrderCancel(OmnitronCommandInterface):
         return reasons_dict
 
     def send(self, validated_data) -> Order:
-        path = self.path.format(validated_data["order"])
+        path = self.path.format(pk=validated_data["order"])
         endpoint = self.endpoint(path=path,
                                  channel_id=self.integration.channel_id,
                                  raw=True)
@@ -439,12 +497,90 @@ class GetCancellationRequest(OmnitronCommandInterface):
         return self.get_cancellation_requests(query_params=query_params)
 
     def get_cancellation_requests(self, query_params={}) -> List[
-        CancellationRequest]:
-        endpoint = self.endpoint(path=self.path,
-                                 channel_id=self.integration.channel_id)
-        cancellation_requests = endpoint.list(query_params)
+            CancellationRequest]:
+        endpoint = self.endpoint(channel_id=self.integration.channel_id)
+        cancellation_requests = endpoint.list(params=query_params)
         for batch in endpoint.iterator:
             if not batch:
                 break
             cancellation_requests.extend(batch)
         return cancellation_requests
+
+
+class UpdateOrderItems(OmnitronCommandInterface):
+    endpoint = ChannelOrderItemEndpoint
+    order_item_pk = None
+    order_item = None
+
+    def get_data(self) -> object:
+        """
+        {
+            "remote_id": "12049323",
+            "status": 550,
+            "invoice_number": "xyz",
+            "invoice_date": None",
+            "tracking_number": "TRACK-1"
+        }
+        """
+        order_item = self.objects
+        self.order_item_pk = self.get_order_item_pk(order_item.remote_id)
+        self.order_item = self.get_order_item(self.order_item_pk)
+        if not self.order_item_pk or not self.order_item:
+            return
+        return order_item
+
+    def validated_data(self, data):
+        if not data:
+            return
+        validated_data = asdict(data)
+        validated_data.pop("remote_id")
+        validated_data.pop("order_remote_id")
+        validated_data = filter(lambda item: bool(item[1]) is True,
+                                validated_data.items())
+        validated_data = dict(validated_data)
+
+        for key, val in validated_data.items():
+            if getattr(self.order_item, key) != val:
+                break
+        else:   # if no changes detected, return None
+            return
+
+        return validated_data
+
+    def get_order_item(self, pk):
+        if not pk:      # if get_order_item_pk returns None
+            return
+        end_point = ChannelOrderItemEndpoint(
+            channel_id=self.integration.channel_id)
+
+        order_item = end_point.retrieve(id=pk)
+        return order_item
+
+    def get_order_item_pk(self, order_item_remote_id):
+        end_point = ChannelIntegrationActionEndpoint(
+            channel_id=self.integration.channel_id)
+        params = {"channel": self.integration.channel_id,
+                  "content_type_name": ContentType.order_item.value,
+                  "remote_id": order_item_remote_id}
+        integration_actions = end_point.list(params=params)
+        if not integration_actions and len(integration_actions) != 1:
+            return
+        integration_action = integration_actions[0]
+        object_id = integration_action.object_id
+        return object_id
+
+    def send(self, validated_data) -> object:
+        if not validated_data:
+            return
+        response = self.endpoint(
+            channel_id=self.integration.channel_id, raw=True
+        ).update(
+            id=self.order_item_pk, item=validated_data
+        )
+        return response
+
+    def normalize_response(self, data, response) -> List[object]:
+        return [response]
+
+    def update_state(self, *args, **kwargs) -> BatchRequestStatus:
+        return BatchRequestStatus.commit

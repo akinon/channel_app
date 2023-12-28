@@ -8,7 +8,8 @@ from channel_app.core import settings
 from channel_app.core.data import (OmnitronCreateOrderDto, OmnitronOrderDto,
                                    ChannelCreateOrderDto,
                                    ErrorReportDto,
-                                   OrderBatchRequestResponseDto, CancelOrderDto)
+                                   OrderBatchRequestResponseDto, CancelOrderDto,
+                                   ChannelUpdateOrderItemDto)
 from channel_app.core.settings import OmnitronIntegration, ChannelIntegration
 from channel_app.omnitron.batch_request import ClientBatchRequest
 from channel_app.omnitron.constants import ContentType
@@ -31,6 +32,7 @@ class OrderService(object):
             )
 
             get_orders: Generator
+            order_batch_objects = []
             while True:
                 try:
                     channel_create_order, report, _ = next(get_orders)
@@ -42,12 +44,23 @@ class OrderService(object):
                 report: ErrorReportDto
 
                 if report and (is_success_log or not report.is_ok):
+                    report.error_code = \
+                        f"{omnitron_integration.batch_request.local_batch_id}" \
+                        f"_GetOrders_{channel_create_order.order.number}"
                     omnitron_integration.do_action(
                         key='create_error_report',
                         objects=report)
 
-                self.create_order(omnitron_integration=omnitron_integration,
-                                  channel_order=channel_create_order)
+                order = self.create_order(omnitron_integration=omnitron_integration,
+                                          channel_order=channel_create_order)
+                if order and omnitron_integration.batch_request.objects:
+                    order_batch_objects.extend(omnitron_integration.batch_request.objects)
+
+            omnitron_integration.batch_request.objects = order_batch_objects
+
+            self.batch_service(settings.OMNITRON_CHANNEL_ID).to_done(
+                batch_request=omnitron_integration.batch_request
+            )
 
     def create_order(self, omnitron_integration: OmnitronIntegration,
                      channel_order: ChannelCreateOrderDto
@@ -57,7 +70,7 @@ class OrderService(object):
         try:
             customer = omnitron_integration.do_action(
                 key='get_or_create_customer',
-                objects=order.customer)
+                objects=order.customer)[0]
         except Exception:
             return
 
@@ -86,6 +99,9 @@ class OrderService(object):
                 object=exc)
             return
 
+        except IndexError:
+            return
+
         shipping_address: Address
         billing_address: Address
         try:
@@ -93,8 +109,7 @@ class OrderService(object):
                 key='get_cargo_company',
                 objects=order.cargo_company
             )[0]
-        except CargoCompanyException:  # TODO: exception
-            # log
+        except (CargoCompanyException, IndexError):
             return
         cargo_company: CargoCompany
 
@@ -112,21 +127,59 @@ class OrderService(object):
                 key='create_order',
                 objects=create_order_dto
             )
-            order = orders[0]  # formatted_data
-        except OrderException:
+            order = orders[0]
+        except (OrderException, IndexError):
             return
 
-        omnitron_integration.do_action(
-            key='create_order_shipping_info',
-            objects=order
-        )
         return order
 
-    def update_orders(self, is_sync=True, is_success_log=True):
+    def fetch_and_update_order_items(self, is_success_log=True):
+        with OmnitronIntegration(
+                content_type=ContentType.order.value) as omnitron_integration:
+            get_updated_orders = ChannelIntegration().do_action(
+                key='get_updated_order_items',
+                batch_request=omnitron_integration.batch_request
+            )
+            get_updated_orders: Generator
+            order_batch_objects = []
+            while True:
+                try:
+                    channel_update_order, report, _ = next(get_updated_orders)
+                except StopIteration:
+                    break
+
+                # tips
+                channel_update_order: ChannelUpdateOrderItemDto
+                report: ErrorReportDto
+
+                if report and (is_success_log or not report.is_ok):
+                    report.error_code = \
+                        f"{omnitron_integration.batch_request.local_batch_id}" \
+                        f"_GetUpdatedOrders_{channel_update_order.remote_id}"
+                    omnitron_integration.do_action(
+                        key='create_error_report',
+                        objects=report)
+
+                omnitron_integration.do_action(
+                    key='update_order_items', objects=channel_update_order)
+
+            omnitron_integration.batch_request.objects = order_batch_objects
+
+            self.batch_service(settings.OMNITRON_CHANNEL_ID).to_done(
+                batch_request=omnitron_integration.batch_request
+            )
+
+
+    def update_orders(self, is_sync=True, is_success_log=True,
+                      add_order_items=False):
         with OmnitronIntegration(
                 content_type=ContentType.order.value) as omnitron_integration:
             orders = omnitron_integration.do_action(key='get_orders')
             orders: List[Order]
+
+            if add_order_items:
+                orders = orders and omnitron_integration.do_action(
+                    key='get_order_items_with_order', objects=orders)
 
             if not orders:
                 return
@@ -197,7 +250,9 @@ class OrderService(object):
         with OmnitronIntegration(
                 content_type=ContentType.order.value) as omnitron_integration:
             get_cancelled_order = ChannelIntegration().do_action(
-                key='get_cancelled_orders')
+                key='get_cancelled_orders',
+                batch_request=omnitron_integration.batch_request
+            )
             get_cancelled_order: Generator
 
             while True:

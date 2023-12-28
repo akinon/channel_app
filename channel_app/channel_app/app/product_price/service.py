@@ -13,7 +13,7 @@ class PriceService(object):
     batch_service = ClientBatchRequest
 
     def update_product_prices(self, is_sync=True, is_success_log=True,
-                              add_product_objects=False):
+                              add_product_objects=False, add_stock=False):
         with OmnitronIntegration(
                 content_type=ContentType.product_price.value) as omnitron_integration:
             product_prices = omnitron_integration.do_action(
@@ -22,6 +22,12 @@ class PriceService(object):
             if add_product_objects:
                 product_prices = product_prices and omnitron_integration.do_action(
                     key='get_product_objects', objects=product_prices)
+
+            if add_stock:
+                product_prices = product_prices and omnitron_integration.do_action(
+                    key='get_stocks_from_product_prices',
+                    objects=product_prices,
+                    stock_list=omnitron_integration.catalog.stock_list)
 
             if not product_prices:
                 return
@@ -59,7 +65,7 @@ class PriceService(object):
                     objects=response_data)
 
     def insert_product_prices(self, is_sync=True, is_success_log=True,
-                              add_product_objects=False):
+                              add_product_objects=False, add_stock=False):
         with OmnitronIntegration(
                 content_type=ContentType.product_price.value) as omnitron_integration:
             product_prices = omnitron_integration.do_action(
@@ -68,6 +74,12 @@ class PriceService(object):
             if add_product_objects:
                 product_prices = product_prices and omnitron_integration.do_action(
                     key='get_product_objects', objects=product_prices)
+
+            if add_stock:
+                product_prices = product_prices and omnitron_integration.do_action(
+                    key='get_stocks_from_product_prices',
+                    objects=product_prices,
+                    stock_list=omnitron_integration.catalog.stock_list)
 
             if not product_prices:
                 return
@@ -106,6 +118,7 @@ class PriceService(object):
 
     def insert_product_prices_from_extra_price_list(self, is_sync=True,
                                                     is_success_log=True,
+                                                    add_stock=False,
                                                     add_product_objects=False):
         currency_mappings = self.get_currency_mappings()
         for price_list_id, country_code in currency_mappings.items():
@@ -117,6 +130,13 @@ class PriceService(object):
                 if add_product_objects:
                     product_prices = product_prices and omnitron_integration.do_action(
                         key='get_product_objects', objects=product_prices)
+
+                if add_stock:
+                    product_prices = product_prices and omnitron_integration.do_action(
+                        key='get_stocks_from_product_prices',
+                        objects=product_prices,
+                        stock_list=omnitron_integration.catalog.stock_list)
+
                 product_prices: List[ProductPrice]
                 if product_prices:
 
@@ -152,6 +172,7 @@ class PriceService(object):
 
     def update_product_prices_from_extra_price_list(self, is_sync=True,
                                                     is_success_log=True,
+                                                    add_stock=False,
                                                     add_product_objects=False):
         currency_mappings = self.get_currency_mappings()
         for price_list_id, country_code in currency_mappings.items():
@@ -163,6 +184,13 @@ class PriceService(object):
                 if add_product_objects:
                     product_prices = product_prices and omnitron_integration.do_action(
                         key='get_product_objects', objects=product_prices)
+
+                if add_stock:
+                    product_prices = product_prices and omnitron_integration.do_action(
+                        key='get_stocks_from_product_prices',
+                        objects=product_prices,
+                        stock_list=omnitron_integration.catalog.stock_list)
+
                 product_prices: List[ProductPrice]
                 if product_prices:
 
