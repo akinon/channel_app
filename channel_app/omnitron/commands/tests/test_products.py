@@ -1032,59 +1032,85 @@ class TestGetUpdatedProductStocks(BaseTestCaseMixin):
         mock_update_batch_request.assert_called_once()
 
     @patch.object(BaseClient, 'get_instance')
-    @patch.object(ChannelIntegrationActionEndpoint, '_list')
     def test_get_stocks_with_available(
         self,
-        mock_endpoint,
         mock_get_instance
     ):
-        example_response = MagicMock()
-        example_response.json.return_value = [
-            {
-                "pk": 1,
-                "channel": 2,
-                "content_type": {
-                    "id": 119,
-                    "app_label": "search",
-                    "model": "productstock"
-                },
-                "object_id": self.sample_stocks[0].pk,
-                "remote_id": None,
-                "version_date": "2023-12-28T10:28:17.186730Z",
-                "state": {},
-                "modified_date": "2023-12-28T10:28:17.187032Z",
-                "local_batch_id": None,
-                "status": None,
-                "created_date": "2023-12-28T10:28:17.187014Z"
-            },
-            {
-                "pk": 2,
-                "channel": 2,
-                "content_type": {
-                    "id": 119,
-                    "app_label": "search",
-                    "model": "productstock"
-                },
-                "object_id": self.sample_stocks[1].pk,
-                "remote_id": None,
-                "version_date": "2023-12-28T10:28:17.186730Z",
-                "state": {},
-                "modified_date": "2023-12-28T10:28:17.187032Z",
-                "local_batch_id": None,
-                "status": None,
-                "created_date": "2023-12-28T10:28:17.187014Z"
-            }
+        mock_endpoint = MagicMock(channel_id=1)
+        mock_endpoint.list.return_value = [
+            MagicMock(
+                pk=1,
+                channel=2,
+                content_type=ContentType.product_stock.value,
+                object_id=self.sample_stocks[0].pk,
+                remote_id=None,
+                version_date="2023-12-28T10:28:17.186730Z",
+                state={},
+                modified_date="2023-12-28T10:28:17.187032Z",
+                local_batch_id=None,
+                status=None,
+                created_date="2023-12-28T10:28:17.187014Z"
+            ),
+            MagicMock(
+                pk=2,
+                channel=2,
+                content_type=ContentType.product_stock.value,
+                object_id=self.sample_stocks[1].pk,
+                remote_id=None,
+                version_date="2023-12-28T10:28:17.186730Z",
+                state={},
+                modified_date="2023-12-28T10:28:17.187032Z",
+                local_batch_id=None,
+                status=None,
+                created_date="2023-12-28T10:28:17.187014Z"
+            )
         ]
-        mock_endpoint.return_value = example_response
 
-        stocks = self.get_updated_product_stocks.get_stocks_with_available(
-            self.sample_stocks
-        )
+        mock_endpoint.iterator = [
+            [
+                MagicMock(
+                    pk=1,
+                    channel=2,
+                    content_type=ContentType.product_stock.value,
+                    object_id=self.sample_stocks[0].pk,
+                    remote_id=None,
+                    version_date="2023-12-28T10:28:17.186730Z",
+                    state={},
+                    modified_date="2023-12-28T10:28:17.187032Z",
+                    local_batch_id=None,
+                    status=None,
+                    created_date="2023-12-28T10:28:17.187014Z"
+                )
+            ],
+            [
+                MagicMock(
+                    pk=2,
+                    channel=2,
+                    content_type=ContentType.product_stock.value,
+                    object_id=self.sample_stocks[1].pk,
+                    remote_id=None,
+                    version_date="2023-12-28T10:28:17.186730Z",
+                    state={},
+                    modified_date="2023-12-28T10:28:17.187032Z",
+                    local_batch_id=None,
+                    status=None,
+                    created_date="2023-12-28T10:28:17.187014Z"
+                )
+            ]
+        ]
+
+        with patch.object(
+                ChannelIntegrationActionEndpoint,
+                '__new__',
+                return_value=mock_endpoint,
+        ):
+            stocks = self.get_updated_product_stocks.get_stocks_with_available(
+                self.sample_stocks
+            )
 
         self.assertEqual(len(stocks), 2)
         self.assertEqual(stocks[0].pk, self.sample_stocks[0].pk)
         self.assertEqual(stocks[1].pk, self.sample_stocks[1].pk)
-        mock_endpoint.assert_called_once()
 
 
 class TestGetInsertedProductStocks(BaseTestCaseMixin):
@@ -1123,14 +1149,14 @@ class TestGetInsertedProductStocks(BaseTestCaseMixin):
         ]
 
     @patch.object(BaseClient, 'get_instance')
-    @patch.object(ChannelIntegrationActionEndpoint, '_list')
+    @patch.object(ChannelIntegrationActionEndpoint, 'list')
     def test_get_stocks_with_available(
         self,
         mock_endpoint,
         mock_get_instance
     ):
         example_response = MagicMock()
-        example_response.json.return_value = [
+        example_response.return_value = [
             {
                 "pk": 1,
                 "channel": 2,
@@ -1166,13 +1192,16 @@ class TestGetInsertedProductStocks(BaseTestCaseMixin):
                 "created_date": "2023-12-28T10:28:17.187014Z"
             }
         ]
-        mock_endpoint.return_value = example_response
 
-        stocks = self.get_inserted_product_stocks.get_stocks_with_available(
-            self.sample_stocks
-        )
+        with patch.object(
+            ChannelIntegrationActionEndpoint,
+            '__new__',
+            return_value=example_response,
+        ):
+            stocks = self.get_inserted_product_stocks.get_stocks_with_available(
+                self.sample_stocks
+            )
 
         self.assertEqual(len(stocks), 2)
         self.assertEqual(stocks[0].pk, self.sample_stocks[0].pk)
         self.assertEqual(stocks[1].pk, self.sample_stocks[1].pk)
-        mock_endpoint.assert_called_once()
