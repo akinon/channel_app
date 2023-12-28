@@ -103,6 +103,8 @@ class GetProductCategoryNodes(OmnitronCommandInterface):
         for product in products:
             product_categories = product_category_endpoint.list(
                 params={"product": product.pk})
+            for item in product_category_endpoint.iterator:
+                product_categories.extend(item)
             category_node_list = []
             for product_category in product_categories:
                 if not str(product_category.category["path"]).startswith(
@@ -116,6 +118,50 @@ class GetProductCategoryNodes(OmnitronCommandInterface):
                      "ProductCategoryNotFound"))
                 continue
             product.category_nodes = category_node_list
+        return products
+
+
+class GetProductCategoryNodesWithIntegrationAction(GetProductCategoryNodes):
+
+    def get_data(self) -> List[Product]:
+        """
+        :return:
+        """
+        products = super(GetProductCategoryNodesWithIntegrationAction,
+                         self).get_data()
+        self.get_category_node_integration_action(products)
+        return products
+
+    def get_category_node_integration_action(self, products: List[Product]):
+        if not products:
+            return []
+
+        category_node_ias_map = {}
+        for chunk in split_list(products, 20):
+            endpoint = ChannelIntegrationActionEndpoint(
+                channel_id=self.integration.channel_id)
+            products_category_node_ids = [
+                str(product.category_nodes[0].get('pk')) for product
+                in chunk if product.category_nodes[0].get('pk')]
+            category_node_ias = endpoint.list(
+                params={"object_id__in": ",".join(products_category_node_ids),
+                        "content_type_name": ContentType.category_node.value,
+                        "channel_id": self.integration.channel_id,
+                        "sort": "id"
+                        })
+
+            for category_node_ias_batch in endpoint.iterator:
+                category_node_ias.extend(category_node_ias_batch)
+
+            category_node_integrations_by_id = {ia.object_id: ia for ia in
+                                                category_node_ias}
+            category_node_ias_map.update(category_node_integrations_by_id)
+
+        for product in products:
+            product.category_nodes[0][
+                'integration_action'] = category_node_ias_map.get(
+                product.category_nodes[0].get('pk'))
+
         return products
 
 
@@ -145,7 +191,7 @@ class GetMappedProducts(OmnitronCommandInterface):
                 "Yaş Grubu": "",
                 "Garanti Süresi": "2",
                 "Taşıma Kapasitesi": "",
-                "Renk": "",
+                "Renk": "Kırmızı",
                 "Ek Özellikler": "WHITE_fixed-deger-123_1",
                 "Taşma Emniyeti": "WHITE",
                 "Cinsiyet": "std",
@@ -164,6 +210,14 @@ class GetMappedProducts(OmnitronCommandInterface):
                     "is_required": false,
                     "is_variant": false,
                     "is_custom": false,
+                    "is_meta": false
+                },
+                "attribute_omnitron_id": {
+                    "attribute_name": "Renk",
+                    "attribute_remote_id": 24,
+                    "is_required": false,
+                    "is_variant": false,
+                    "is_custom": true,
                     "is_meta": false
                 }
             }
@@ -208,6 +262,16 @@ class GetMappedProducts(OmnitronCommandInterface):
         attribute_id = str(config.attribute["pk"])
         attribute_value_conf = mapped_attribute_values.get(attribute_id)
         if not attribute_value_conf:
+            if not product.mapped_attributes.mapped_attribute_values.get(
+                    attribute_id, None):
+                product.mapped_attributes.mapped_attribute_values[
+                    attribute_id] = {
+                    "attribute_name": config.attribute.get("name"),
+                    "attribute_remote_id": config.attribute_remote_id,
+                    "is_required": config.is_required,
+                    "is_variant": config.is_variant,
+                    "is_custom": config.is_custom,
+                    "is_meta": config.is_meta}
             return False
         try:
             self.check_attribute_value_defined(config, mapped_attributes)
@@ -366,6 +430,10 @@ class GetProductPrices(OmnitronCommandInterface):
     def get_prices(self, chunk, endpoint):
         price_batch = endpoint.list(params={"product__pk__in": ",".join(chunk),
                                             "price_list": self.integration.catalog.price_list})
+        for item in endpoint.iterator:
+            if not item:
+                break
+            price_batch.extend(item)
         return price_batch
 
 
@@ -440,6 +508,10 @@ class GetProductStocks(OmnitronCommandInterface):
     def get_stocks(self, chunk, endpoint):
         stock_batch = endpoint.list(params={"product__pk__in": ",".join(chunk),
                                             "stock_list": self.integration.catalog.stock_list})
+        for item in endpoint.iterator:
+            if not item:
+                break
+            stock_batch.extend(item)
         return stock_batch
 
 
@@ -469,6 +541,7 @@ class GetUpdatedProducts(GetInsertedProducts):
                 params={"object_id__in": ",".join(product_ids),
                         "content_type_name": ContentType.product.value,
                         "channel_id": self.integration.channel_id,
+                        "sort": "id"
                         })
 
             for product_batch in endpoint.iterator:
@@ -522,9 +595,9 @@ class ProcessProductBatchRequests(OmnitronCommandInterface,
                                                   integration_actions):
         channel_items_by_product_id = {}
         for product_id, product in model_items_by_content["product"].items():
+            sku = self.get_barcode(obj=product)
             for channel_item in channel_response:
                 # TODO: comment
-                sku = self.get_barcode(obj=product)
                 if channel_item.sku != sku:
                     continue
                 remote_item = channel_item
@@ -582,44 +655,60 @@ class ProcessDeletedProductBatchRequests(ProcessProductBatchRequests):
 
         remote_ids = []
         fail_remote_ids = []
+        integration_actions = []
         for remote_item in channel_response:
             if remote_item.status == ResponseStatus.success:
                 remote_ids.append(remote_item.remote_id)
             else:
                 fail_remote_ids.append(remote_item.remote_id)
 
-        integration_actions = self.get_integration_actions_for_remote_ids(
-            endpoint, remote_ids)
-        # successful integration action objects are deleted
-        for integration_action in integration_actions:
-            endpoint.delete(id=integration_action.pk)
+        if remote_ids:
+            integration_actions = self.get_integration_actions_for_remote_ids(
+                remote_ids)
+
+            # successful integration action objects are deleted
+            for integration_action in integration_actions:
+                if integration_action.content_type.get(
+                        "model") in [ContentType.product.value,
+                                     ContentType.product_price.value,
+                                     ContentType.product_stock.value,
+                                     ContentType.product_image.value]:
+                    endpoint.delete(id=integration_action.pk)
 
         # faulty integration action objects are reported
-        fail_integration_actions = self.get_integration_actions_for_remote_ids(
-            endpoint, fail_remote_ids)
+        if fail_remote_ids:
+            fail_integration_actions = self.get_integration_actions_for_remote_ids(
+                fail_remote_ids)
 
-        for integration_action_obj in fail_integration_actions:
-            integration_action_obj.failed_reason_type = \
-                FailedReasonType.channel_app.value
+            for integration_action_obj in fail_integration_actions:
+                integration_action_obj.failed_reason_type = \
+                    FailedReasonType.channel_app.value
 
-        objects_data = self.create_batch_objects(
-            data=fail_integration_actions,
-            content_type=ContentType.integration_action.value)
-        # done
-        self.update_batch_request(objects_data=objects_data)
+            objects_data = self.create_batch_objects(
+                data=fail_integration_actions,
+                content_type=ContentType.integration_action.value)
+            # done
+            self.update_batch_request(objects_data=objects_data)
         return integration_actions
 
-    def get_integration_actions_for_remote_ids(self, endpoint, remote_ids):
-        integration_actions = endpoint.list(params={
-            "remote_id__in": remote_ids,
-            "channel": self.integration.channel_id,
-            "local_batch_id": self.integration.batch_request.local_batch_id,
-        })
-        for ia_batch in endpoint.iterator:
-            if not ia_batch:
-                break
-            integration_actions.extend(ia_batch)
-        return integration_actions
+    def get_integration_actions_for_remote_ids(self, remote_ids):
+        if not remote_ids:
+            return []
+        integration_actions_list = []
+        for chunk in split_list(remote_ids, 10):
+            endpoint = ChannelIntegrationActionEndpoint(
+                channel_id=self.integration.channel_id)
+            integration_actions = endpoint.list(params={
+                "remote_id__in": ",".join(str(r) for r in chunk),
+                "channel": self.integration.channel_id,
+                "sort": "id"
+            })
+            for ia_batch in endpoint.iterator:
+                if not ia_batch:
+                    break
+                integration_actions.extend(ia_batch)
+            integration_actions_list.extend(integration_actions)
+        return [ial for ial in integration_actions_list if ial.remote_id in remote_ids]
 
 
 class GetProductObjects(OmnitronCommandInterface):
@@ -665,7 +754,8 @@ class GetProductObjects(OmnitronCommandInterface):
                 channel_id=self.integration.channel_id,
             )
             products = endpoint.list(
-                params={"pk__in": ",".join(c for c in chunk)})
+                params={"pk__in": ",".join(c for c in chunk),
+                        "sort": "id"})
 
             for product in endpoint.iterator:
                 if not product:

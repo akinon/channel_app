@@ -41,6 +41,8 @@ class GetBatchRequests(OmnitronCommandInterface):
         if not params:
             return []
 
+        params.update({"channel": self.integration.channel_id})
+
         batch_requests = self.endpoint(
             channel_id=self.integration.channel_id
         ).list(params=params)
@@ -122,7 +124,7 @@ class ProcessBatchRequests(object):
         products = []
         for chunk_id_list in split_list(id_list, self.CHUNK_SIZE):
             products_batch = end_point.list(
-                params={"pk__in": ",".join(id_list),
+                params={"pk__in": ",".join(chunk_id_list),
                         "limit": len(chunk_id_list)})
             products.extend(products_batch)
 
@@ -180,7 +182,8 @@ class ProcessBatchRequests(object):
             channel_id=self.integration.channel_id)
         images = []
         for chunk in split_list(id_list, self.CHUNK_SIZE):
-            image_batch = endpoint.list(params={"id__in": ",".join(chunk)})
+            image_batch = endpoint.list(params={"id__in": ",".join(chunk),
+                                                "limit": len(chunk)})
             images.extend(image_batch)
             if not image_batch:
                 break
