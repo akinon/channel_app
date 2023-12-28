@@ -180,7 +180,7 @@ class GetOrCreateAddress(OmnitronCommandInterface):
     def get_country(self, country_code: str) -> Country:
         endpoint = ChannelCountryEndpoint(channel_id=self.integration.channel_id)
 
-        params = {"code__exact": country_code}
+        params = {"code__exact": country_code, "is_active": True}
         countries = endpoint.list(params=params)
         if len(countries) == 1:
             return countries[0]
@@ -200,7 +200,11 @@ class GetOrCreateAddress(OmnitronCommandInterface):
     def get_city(self, country: Country, city_name: str) -> City:
         endpoint = ChannelCityEndpoint(channel_id=self.integration.channel_id)
 
-        params = {"name__exact": city_name, "country": country.pk}
+        params = {
+            "name__iexact": city_name,
+            "country": country.pk,
+            "is_active": True
+        }
         cities = endpoint.list(params=params)
         if len(cities) == 1:
             return cities[0]
@@ -221,7 +225,12 @@ class GetOrCreateAddress(OmnitronCommandInterface):
     def get_township(self, country: Country, city: City, township_name: str) -> Township:
         endpoint = ChannelTownshipEndpoint(channel_id=self.integration.channel_id)
 
-        params = {"name__exact": township_name, "country": country.pk, "city": city.pk}
+        params = {
+            "name__iexact": township_name,
+            "country": country.pk,
+            "city": city.pk,
+            "is_active": True
+        }
         townships = endpoint.list(params=params)
         if len(townships) == 1:
             return townships[0]
@@ -244,8 +253,13 @@ class GetOrCreateAddress(OmnitronCommandInterface):
                      district_name: str) -> District:
         endpoint = ChannelDistrictEndpoint(channel_id=self.integration.channel_id)
 
-        params = {"name__exact": district_name, "country": country.pk, "city": city.pk,
-                  "township": township.pk}
+        params = {
+            "name__exact": district_name,
+            "country": country.pk,
+            "city": city.pk,
+            "township": township.pk,
+            "is_active": True
+        }
         districts = endpoint.list(params=params)
         if len(districts) == 1:
             return districts[0]

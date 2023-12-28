@@ -1,4 +1,4 @@
-from omnisdk.omnitron.client import OmnitronApiClient
+from channel_app.core.clients import OmnitronApiClient
 
 from channel_app.core.integration import BaseIntegration
 from channel_app.omnitron.batch_request import ClientBatchRequest

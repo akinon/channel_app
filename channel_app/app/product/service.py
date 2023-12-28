@@ -20,6 +20,8 @@ class ProductService(object):
                 content_type=ContentType.product.value) as omnitron_integration:
             products = omnitron_integration.do_action(
                 key='get_inserted_products')
+            
+            first_product_count = len(products)
 
             if add_mapped:
                 products = products and omnitron_integration.do_action(
@@ -38,6 +40,12 @@ class ProductService(object):
                     key='get_product_categories', objects=products)
 
             if not products:
+                if first_product_count:
+                    omnitron_integration.batch_request.objects = None
+                    self.batch_service(omnitron_integration.channel_id).to_fail(
+                        omnitron_integration.batch_request
+                    )
+                    
                 return
 
             products: List[Product]
@@ -78,6 +86,8 @@ class ProductService(object):
                 content_type=ContentType.product.value) as omnitron_integration:
             products = omnitron_integration.do_action(
                 key='get_updated_products')
+            
+            first_product_count = len(products)
 
             if add_mapped:
                 products = products and omnitron_integration.do_action(
@@ -96,6 +106,12 @@ class ProductService(object):
                     key='get_product_categories', objects=products)
 
             if not products:
+                if first_product_count:
+                    omnitron_integration.batch_request.objects = None
+                    self.batch_service(omnitron_integration.channel_id).to_fail(
+                        omnitron_integration.batch_request
+                    )
+                    
                 return
 
             products: List[Product]
@@ -226,7 +242,7 @@ class ProductService(object):
                 report: ErrorReportDto
                 data: BatchRequest
 
-                if report and not (is_success_log or report.is_ok):
+                if report and (is_success_log or not report.is_ok):
                     omnitron_integration.do_action(
                         key='create_error_report',
                         objects=report)

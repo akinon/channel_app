@@ -1,0 +1,14 @@
+image: python:3.8.10
+
+pipelines:
+  pull-requests:
+    '**':
+      - step:
+          name: Test
+          caches:
+            - pip
+          script:
+            - python -m pip install --upgrade setuptools
+            - make install && make install-dev
+            - make test
+            - make coverage
