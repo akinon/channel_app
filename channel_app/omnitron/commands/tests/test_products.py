@@ -5,29 +5,38 @@ from omnisdk.omnitron.endpoints import (
     ChannelCategoryTreeEndpoint,
     ChannelIntegrationActionEndpoint,
     ChannelProductCategoryEndpoint,
-    ChannelProductEndpoint, 
-    ChannelProductStockEndpoint,
+    ChannelProductEndpoint,
+    ChannelProductStockEndpoint, 
+    ChannelExtraProductStockEndpoint, 
+    ChannelExtraProductPriceEndpoint
 )
 from omnisdk.omnitron.models import ChannelAttributeConfig, ProductStock
 
 from channel_app.core.commands import OmnitronCommandInterface
 from channel_app.core.tests import BaseTestCaseMixin
 from channel_app.omnitron.commands.batch_requests import GetBatchRequests
-from channel_app.omnitron.commands.product_stocks import GetInsertedProductStocks, GetUpdatedProductStocks
+from channel_app.omnitron.commands.product_prices import GetProductStocksFromProductPrices
+from channel_app.omnitron.commands.product_stocks import (
+    GetInsertedProductStocks,
+    GetProductPricesFromProductStocks,
+    GetUpdatedProductStocks,
+    GetUpdatedProductStocksFromExtraStockList, 
+    GetInsertedProductStocksFromExtraStockList
+)
 from channel_app.omnitron.commands.products import (
     GetDeletedProducts,
     GetInsertedProducts,
     GetUpdatedProducts,
-    Product, 
-    GetMappedProducts, 
-    GetProductPrices, 
-    GetProductStocks, 
+    Product,
+    GetMappedProducts,
+    GetProductPrices,
+    GetProductStocks,
     GetProductCategoryNodes,
     GetProductCategoryNodesWithIntegrationAction,
 )
 from channel_app.omnitron.constants import (
-    BatchRequestStatus, 
-    ContentType, 
+    BatchRequestStatus,
+    ContentType,
     FailedReasonType
 )
 
@@ -38,23 +47,24 @@ class TestGetInsertedProducts(BaseTestCaseMixin):
     
     run: python -m unittest channel_app.omnitron.commands.tests.test_products.TestGetInsertedProducts
     """
+
     def setUp(self) -> None:
         self.get_inserted_products = GetInsertedProducts(
             integration=self.mock_integration
         )
         self.sample_products = [
-            Product(name='test', failed_reason_type=None), 
+            Product(name='test', failed_reason_type=None),
             Product(name='test2', failed_reason_type='error')
         ]
         self.limit = 1
-    
+
     @patch.object(GetInsertedProducts, 'get_products')
     def test_get_data(self, mock_get_products):
         mock_get_products.return_value = [self.sample_products[0]]
         self.get_inserted_products.BATCH_SIZE = self.limit
-        
+
         products = self.get_inserted_products.get_data()
-        
+
         self.assertEqual(len(products), 1)
         self.assertEqual(products[0].name, 'test')
         mock_get_products.assert_called_once_with(limit=self.limit)
@@ -63,27 +73,27 @@ class TestGetInsertedProducts(BaseTestCaseMixin):
     def test_get_data_with_limit_in_objects_dict(self, mock_get_products):
         mock_get_products.return_value = [self.sample_products[0]]
         self.get_inserted_products.objects = {'limit': self.limit}
-        
+
         products = self.get_inserted_products.get_data()
-        
+
         self.assertEqual(len(products), 1)
         self.assertEqual(products[0].name, 'test')
         mock_get_products.assert_called_once_with(limit=self.limit)
-        
+
     def test_update_state_property(self):
         self.assertEqual(
             self.get_inserted_products.update_state,
             BatchRequestStatus.commit
         )
-        
+
     def test_validated_data(self):
         validated_products = self.get_inserted_products.validated_data(
             self.sample_products
         )
-        
+
         self.assertIn(self.sample_products[0], validated_products)
         self.assertNotIn(self.sample_products[1], validated_products)
-    
+
     @patch('channel_app.core.clients.OmnitronApiClient')
     @patch.object(BaseClient, 'get_instance')
     @patch.object(GetInsertedProducts, 'update_batch_request')
@@ -98,21 +108,22 @@ class TestGetInsertedProducts(BaseTestCaseMixin):
         mock_omnitron_api_client,
     ):
         mock_list.return_value = self.sample_products
-        
+
         products = self.get_inserted_products.get_products(
             limit=self.limit + 1
         )
-        
-        self.assertEqual(len(products), 2)        
+
+        self.assertEqual(len(products), 2)
         self.assertEqual(products[0].name, 'test')
         self.assertEqual(products[1].name, 'test2')
-        
+
 
 class TestGetUpdatedProducts(BaseTestCaseMixin):
     """
     Test case for GetUpdatedProducts
     run: python -m unittest channel_app.omnitron.commands.tests.test_products.TestGetUpdatedProducts
     """
+
     def setUp(self):
         self.get_inserted_products = GetInsertedProducts(
             integration=self.mock_integration
@@ -122,28 +133,28 @@ class TestGetUpdatedProducts(BaseTestCaseMixin):
         )
         self.sample_products = [
             Product(
-                pk=1, 
-                name='test', 
-                failed_reason_type=None, 
+                pk=1,
+                name='test',
+                failed_reason_type=None,
                 modified_date='2021-01-01T00:00:00Z',
                 integration_action=MagicMock()
-            ), 
+            ),
             Product(
-                pk=2, 
-                name='test2', 
-                failed_reason_type='error', 
+                pk=2,
+                name='test2',
+                failed_reason_type='error',
                 modified_date='2021-01-01T00:00:00Z',
                 integration_action=MagicMock()
             )
         ]
-    
+
     @patch.object(GetInsertedProducts, 'get_products')
     @patch.object(GetUpdatedProducts, 'get_integration_actions')
     def test_get_data(self, mock_get_integration_actions, mock_get_products):
         mock_get_integration_actions.return_value = self.sample_products
         mock_get_products.return_value = [self.sample_products[0]]
         products = self.get_updated_products.get_data()
-        
+
         self.assertEqual(len(products), 1)
         self.assertEqual(products[0].name, 'test')
 
@@ -185,27 +196,27 @@ class TestGetUpdatedProducts(BaseTestCaseMixin):
 
         self.assertEqual(len(products), 2)
 
-    
     def test_get_integration_actions_without_product(self):
         products = self.get_updated_products.get_integration_actions([])
         self.assertEqual(products, [])
 
 
 class TestGetInsertedOrUpdatedProducts(
-    TestGetInsertedProducts, 
+    TestGetInsertedProducts,
     BaseTestCaseMixin
 ):
     """
     Test case for GetInsertedOrUpdatedProducts
     run: python -m unittest channel_app.omnitron.commands.tests.test_products.TestGetInsertedOrUpdatedProducts
     """
+
     def setUp(self) -> None:
         self.get_inserted_products = GetInsertedProducts(
             integration=self.mock_integration
         )
         self.get_inserted_products.path = "inserts_or_updates"
         return super().setUp()
-    
+
 
 class TestGetDeletedProducts(BaseTestCaseMixin):
     """
@@ -236,13 +247,13 @@ class TestGetDeletedProducts(BaseTestCaseMixin):
                 "created_date": "2023-11-08T09:11:56.919929Z"
             }
         ]
-    
+
     @patch.object(GetDeletedProducts, 'get_deleted_products_ia')
     def test_get_data(self, mock_get_deleted_products_ia):
         mock_get_deleted_products_ia.return_value = self.products
         products = self.get_deleted_products.get_data()
         self.assertEqual(len(products), 1)
-        
+
         product = products[0]
         self.assertEqual(product.get('pk'), 23)
 
@@ -252,7 +263,7 @@ class TestGetDeletedProducts(BaseTestCaseMixin):
     def test_get_deleted_products_ia(
         self,
         mock_list,
-        mock_get_instance, 
+        mock_get_instance,
         mock_omnitron_api_client
     ):
         example_response = MagicMock()
@@ -260,7 +271,7 @@ class TestGetDeletedProducts(BaseTestCaseMixin):
         mock_list.return_value = example_response
         products_ia = self.get_deleted_products.get_deleted_products_ia()
         self.assertEqual(len(products_ia), 1)
-        
+
         product = products_ia[0].get_parameters()
         self.assertEqual(product.get('pk'), 23)
 
@@ -355,9 +366,9 @@ class TestGetMappedProducts(BaseTestCaseMixin):
     @patch.object(GetMappedProducts, 'check_attribute_value_defined')
     @patch.object(GetMappedProducts, 'check_required')
     def test_update_and_check_product(
-            self,
-            mock_check_required,
-            mock_check_attribute_value_defined
+        self,
+        mock_check_required,
+        mock_check_attribute_value_defined
     ):
         product = Product()
         product.mapped_attributes = MagicMock()
@@ -490,9 +501,9 @@ class TestGetProductPrices(BaseTestCaseMixin):
     @patch.object(GetProductPrices, 'get_prices')
     @patch.object(BaseClient, 'get_instance')
     def test_product_price_retrieval_with_failed_get_product_price(
-            self,
-            mock_get_instance,
-            mock_get_prices
+        self,
+        mock_get_instance,
+        mock_get_prices
     ):
         products = [Product(pk=i, product_price=0) for i in range(1, 6)]
 
@@ -752,9 +763,9 @@ class TestGetProductCategoryNodes(BaseTestCaseMixin):
         ]
 
         with patch.object(
-            ChannelCategoryTreeEndpoint,
-            '__new__',
-            return_value=category_tree_endpoint,
+                ChannelCategoryTreeEndpoint,
+                '__new__',
+                return_value=category_tree_endpoint,
         ), patch.object(
             ChannelProductCategoryEndpoint,
             '__new__',
@@ -787,7 +798,7 @@ class TestGetProductCategoryNodesWithIntegrationAction(TestGetProductCategoryNod
         )
         self.sample_products = [
             Product(
-                pk=1, 
+                pk=1,
                 category_nodes=[
                     {
                         'pk': 1,
@@ -796,7 +807,7 @@ class TestGetProductCategoryNodesWithIntegrationAction(TestGetProductCategoryNod
                 ]
             ),
             Product(
-                pk=2, 
+                pk=2,
                 category_nodes=[
                     {
                         'pk': 2,
@@ -863,10 +874,10 @@ class TestGetProductCategoryNodesWithIntegrationAction(TestGetProductCategoryNod
         mock_endpoint.return_value = integration_action_endpoint
 
         with patch.object(
-            ChannelIntegrationActionEndpoint, 
-            '__new__',
-            return_value=integration_action_endpoint,
-            channel_id=1
+                ChannelIntegrationActionEndpoint,
+                '__new__',
+                return_value=integration_action_endpoint,
+                channel_id=1
         ):
             result = self.get_product_category_nodes.get_category_node_integration_action(
                 self.sample_products
@@ -921,7 +932,7 @@ class TestGetUpdatedProductStocks(BaseTestCaseMixin):
     Test case for GetUpdatedProductStocks
     run: python -m unittest channel_app.omnitron.commands.tests.test_products.TestGetUpdatedProductStocks
     """
-    
+
     def setUp(self) -> None:
         self.get_updated_product_stocks = GetUpdatedProductStocks(
             integration=self.mock_integration
@@ -1194,9 +1205,9 @@ class TestGetInsertedProductStocks(BaseTestCaseMixin):
         ]
 
         with patch.object(
-            ChannelIntegrationActionEndpoint,
-            '__new__',
-            return_value=example_response,
+                ChannelIntegrationActionEndpoint,
+                '__new__',
+                return_value=example_response,
         ):
             stocks = self.get_inserted_product_stocks.get_stocks_with_available(
                 self.sample_stocks
@@ -1205,3 +1216,603 @@ class TestGetInsertedProductStocks(BaseTestCaseMixin):
         self.assertEqual(len(stocks), 2)
         self.assertEqual(stocks[0].pk, self.sample_stocks[0].pk)
         self.assertEqual(stocks[1].pk, self.sample_stocks[1].pk)
+
+
+class TestGetUpdatedProductStocksFromExtraStockList(BaseTestCaseMixin):
+    """
+    Test case for GetupdatedProductStocksFromExtraStockList
+    run: python -m unittest channel_app.omnitron.commands.tests.test_products.TestGetUpdatedProductStocksFromExtraStockList
+    """
+
+    def setUp(self) -> None:
+        self.get_updated_product_stocks_from_extra_stock_list = GetUpdatedProductStocksFromExtraStockList(
+            integration=self.mock_integration
+        )
+        self.sample_stocks = [
+            ProductStock(
+                pk=3,
+                product=1,
+                stock=0,
+                stock_list=4,
+                unit_type='qty',
+                extra_field={},
+                sold_quantity_unreported=0,
+                modified_date='2023-12-19T08:38:48.476005Z',
+                created_date='2023-12-19T08:38:48.475992Z'
+            ),
+            ProductStock(
+                pk=4,
+                product=2,
+                stock=0,
+                stock_list=4,
+                unit_type='qty',
+                extra_field={},
+                sold_quantity_unreported=0,
+                modified_date='2023-12-19T08:38:48.476005Z',
+                created_date='2023-12-19T08:38:48.475992Z'
+            )
+        ]
+        self.objects = self.sample_stocks
+        self.stock_list_id = 4
+
+    @patch.object(
+        BaseClient, 
+        'get_instance'
+    )
+    @patch.object(
+        GetUpdatedProductStocksFromExtraStockList, 
+        'get_product_stocks'
+    )
+    @patch.object(
+        GetUpdatedProductStocksFromExtraStockList, 
+        'get_integration_actions'
+    )
+    def test_get_data(
+        self,
+        mock_get_integration_actions,
+        mock_get_product_stocks,
+        mock_get_instance
+    ):
+        mock_get_integration_actions.return_value = self.sample_stocks
+        mock_get_product_stocks.return_value = self.sample_stocks
+        stocks = self.get_updated_product_stocks_from_extra_stock_list.get_data()
+
+        self.assertEqual(len(stocks), 2)
+        self.assertEqual(stocks[0].pk, self.sample_stocks[0].pk)
+        self.assertEqual(stocks[1].pk, self.sample_stocks[1].pk)
+
+    @patch.object(
+        BaseClient, 
+        'get_instance'
+    )
+    @patch.object(
+        ChannelIntegrationActionEndpoint, 
+        'list'
+    )
+    @patch.object(
+        GetUpdatedProductStocksFromExtraStockList, 
+        'create_batch_objects'
+    )
+    @patch.object(
+        GetUpdatedProductStocksFromExtraStockList, 
+        'update_batch_request'
+    )
+    def test_get_product_stocks(
+        self,
+        mock_update_batch_request,
+        mock_create_batch_objects,
+        mock_list,
+        mock_get_instance
+    ):
+        self.get_updated_product_stocks_from_extra_stock_list.objects = self.objects
+        self.get_updated_product_stocks_from_extra_stock_list.stock_list_id = self.stock_list_id
+
+        mock_endpoint = MagicMock()
+        mock_endpoint.list.return_value = [
+            {
+                'pk': 3,
+                'product': 1,
+                'stock': 0,
+                'stock_list': 4,
+                'unit_type': 'qty',
+                'extra_field': {},
+                'sold_quantity_unreported': 0,
+                'modified_date': '2023-12-19T08:38:48.476005Z',
+                'created_date': '2023-12-19T08:38:48.475992Z'
+            },
+            {
+                'pk': 4,
+                'product': 2,
+                'stock': 0,
+                'stock_list': 4,
+                'unit_type': 'qty',
+                'extra_field': {},
+                'sold_quantity_unreported': 0,
+                'modified_date': '2023-12-19T08:38:48.476005Z',
+                'created_date': '2023-12-19T08:38:48.475992Z'
+            }
+        ]
+
+        with patch.object(
+            ChannelExtraProductStockEndpoint,
+            '__new__',
+            return_value=mock_endpoint
+        ):
+            stocks = self.get_updated_product_stocks_from_extra_stock_list.get_product_stocks()
+
+        self.assertEqual(len(stocks), 2)
+        self.assertEqual(stocks[0].get('pk'), 3)
+        self.assertEqual(stocks[1].get('pk'), 4)
+
+    def test_get_integration_actions_without_stocks(self):
+        self.sample_stocks = []
+        stocks = self.get_updated_product_stocks_from_extra_stock_list.get_integration_actions(
+            self.sample_stocks
+        )
+        self.assertEqual(stocks, [])
+
+    @patch.object(BaseClient, 'get_instance')
+    @patch.object(ChannelIntegrationActionEndpoint, 'list')
+    def test_get_integration_actions(
+        self,
+        mock_get_instance,
+        mock_list
+    ):
+        mock_endpoint = MagicMock()
+        mock_endpoint.list.return_value = [
+            MagicMock(
+                pk=1,
+                channel=2,
+                content_type=ContentType.product_stock.value,
+                object_id=self.sample_stocks[0].pk,
+                remote_id=None,
+                version_date="2023-12-28T10:28:17.186730Z",
+                state={},
+                modified_date="2023-12-28T10:28:17.187032Z",
+                local_batch_id=None,
+                status=None,
+                created_date="2023-12-28T10:28:17.187014Z"
+            ),
+            MagicMock(
+                pk=2,
+                channel=2,
+                content_type=ContentType.product_stock.value,
+                object_id=self.sample_stocks[1].pk,
+                remote_id=None,
+                version_date="2023-12-28T10:28:17.186730Z",
+                state={},
+                modified_date="2023-12-28T10:28:17.187032Z",
+                local_batch_id=None,
+                status=None,
+                created_date="2023-12-28T10:28:17.187014Z"
+            )
+        ]
+        mock_endpoint.iterator = [
+            [
+                MagicMock(
+                    pk=1,
+                    channel=2,
+                    content_type=ContentType.product_stock.value,
+                    object_id=self.sample_stocks[0].pk,
+                    remote_id=None,
+                    version_date="2023-12-28T10:28:17.186730Z",
+                    state={},
+                    modified_date="2023-12-28T10:28:17.187032Z",
+                    local_batch_id=None,
+                    status=None,
+                    created_date="2023-12-28T10:28:17.187014Z"
+                )
+            ],
+            [
+                MagicMock(
+                    pk=2,
+                    channel=2,
+                    content_type=ContentType.product_stock.value,
+                    object_id=self.sample_stocks[1].pk,
+                    remote_id=None,
+                    version_date="2023-12-28T10:28:17.186730Z",
+                    state={},
+                    modified_date="2023-12-28T10:28:17.187032Z",
+                    local_batch_id=None,
+                    status=None,
+                    created_date="2023-12-28T10:28:17.187014Z"
+                )
+            ]
+        ]
+
+        with patch.object(
+            ChannelIntegrationActionEndpoint,
+            '__new__',
+            return_value=mock_endpoint
+        ):
+            stocks = self.get_updated_product_stocks_from_extra_stock_list.get_integration_actions(
+                self.sample_stocks
+            )
+
+        self.assertEqual(len(stocks), 2)
+        self.assertEqual(stocks[0].pk, self.sample_stocks[0].pk)
+        self.assertEqual(stocks[1].pk, self.sample_stocks[1].pk)
+
+
+class TestGetProductPricesFromProductStocks(BaseTestCaseMixin):
+    """
+    Test case for GetProductPricesFromProductStocks
+    run: python -m unittest channel_app.omnitron.commands.tests.test_products.TestGetProductPricesFromProductStocks
+    """
+
+    def setUp(self) -> None:
+        self.get_product_prices_from_product_stocks = GetProductPricesFromProductStocks(
+            integration=self.mock_integration
+        )
+        self.sample_stocks = [
+            ProductStock(
+                pk=3,
+                product=1,
+                stock=0,
+                stock_list=4,
+                unit_type='qty',
+                extra_field={},
+                sold_quantity_unreported=0,
+                modified_date='2023-12-19T08:38:48.476005Z',
+                created_date='2023-12-19T08:38:48.475992Z',
+                productprice=10
+            ),
+            ProductStock(
+                pk=4,
+                product=2,
+                stock=0,
+                stock_list=4,
+                unit_type='qty',
+                extra_field={},
+                sold_quantity_unreported=0,
+                modified_date='2023-12-19T08:38:48.476005Z',
+                created_date='2023-12-19T08:38:48.475992Z',
+                productprice=10
+            )
+        ]
+
+    @patch.object(BaseClient, 'get_instance')
+    @patch.object(GetProductPricesFromProductStocks, 'get_product_price')
+    def test_get_data(
+        self,
+        mock_get_product_price,
+        mock_get_instance
+    ):
+        self.get_product_prices_from_product_stocks.objects = self.sample_stocks
+        stocks = self.get_product_prices_from_product_stocks.get_data()
+        self.assertEqual(len(stocks), 2)
+        self.assertEqual(stocks[0].pk, self.sample_stocks[0].pk)
+        self.assertEqual(stocks[1].pk, self.sample_stocks[1].pk)
+
+    @patch.object(BaseClient, 'get_instance')
+    @patch.object(GetProductPricesFromProductStocks, 'create_batch_objects')
+    @patch.object(GetProductPricesFromProductStocks, 'create_integration_actions')
+    @patch.object(GetProductPricesFromProductStocks, 'update_batch_request')
+    def test_normalize_response(
+        self,
+        mock_update_batch_request,
+        mock_create_integration_actions,
+        mock_create_batch_objects,
+        mock_get_instance
+    ):
+        data = self.get_product_prices_from_product_stocks.normalize_response(
+            self.sample_stocks,
+            None
+        )
+        self.assertEqual(len(data), 2)
+        self.assertEqual(data[0].pk, self.sample_stocks[0].pk)
+        self.assertEqual(data[1].pk, self.sample_stocks[1].pk)
+
+    @patch.object(GetProductPricesFromProductStocks, 'create_batch_objects')
+    def test_create_integration_actions(
+        self,
+        mock_create_batch_objects
+    ):
+        self.get_product_prices_from_product_stocks.create_integration_actions(
+            self.sample_stocks,
+            []
+        )
+        self.assertEqual(mock_create_batch_objects.call_count, 1)
+
+    def test_get_product_price_with_empty_stock(self):
+        stocks = self.get_product_prices_from_product_stocks.get_product_price(
+            []
+        )
+        self.assertEqual(stocks, [])
+
+    @patch.object(BaseClient, 'get_instance')
+    @patch.object(ChannelExtraProductPriceEndpoint, 'list')
+    @patch.object(GetProductPricesFromProductStocks, 'get_prices')
+    def test_get_product_price(
+        self,
+        mock_get_prices,
+        mock_list,
+        mock_get_instance
+    ):
+        example_response = MagicMock()
+        example_response.list.return_value = self.sample_stocks
+        example_response.iterator = iter(self.sample_stocks)
+
+        with patch.object(
+            ChannelExtraProductPriceEndpoint,
+            '__new__',
+            return_value=example_response
+        ):
+            stocks = self.get_product_prices_from_product_stocks.get_product_price(
+                self.sample_stocks
+            )
+
+        self.assertEqual(len(stocks), 2)
+        self.assertEqual(stocks[0].pk, self.sample_stocks[0].pk)
+        self.assertEqual(stocks[1].pk, self.sample_stocks[1].pk)
+        self.assertEqual(
+            stocks[0].failed_reason_type, 
+            FailedReasonType.channel_app.value
+        )
+        self.assertEqual(
+            stocks[1].failed_reason_type, 
+            FailedReasonType.channel_app.value
+        )
+
+    @patch.object(BaseClient, 'get_instance')
+    @patch.object(ChannelExtraProductPriceEndpoint, 'list')
+    def test_get_prices(
+        self,
+        mock_list,
+        mock_get_instance
+    ):
+        product_prices = [
+            MagicMock(
+                pk=1,
+                product=5,
+                price='645670668.11',
+                price_list=1,
+                currency_type='try',
+                tax_rate='32.61',
+                retail_price=None,
+                extra_field={},
+                discount_percentage='63.57',
+                modified_date='2024-01-02T07:53:06.392780Z',
+                created_date='2024-01-02T07:53:06.392771Z',
+                price_type='default'
+            )
+        ]
+        
+        example_response = MagicMock()
+        example_response.list.return_value = product_prices
+        example_response.iterator = iter(product_prices)
+
+        with patch.object(
+            ChannelExtraProductPriceEndpoint,
+            '__new__',
+            return_value=example_response
+        ):
+            stocks = self.get_product_prices_from_product_stocks.get_prices(
+                "1,2,3",
+                ChannelExtraProductPriceEndpoint()
+            )
+        
+        self.assertEqual(len(stocks), 1)
+        self.assertEqual(stocks[0].pk, product_prices[0].pk)
+        self.assertEqual(stocks[0].product, product_prices[0].product)
+        self.assertEqual(stocks[0].price, product_prices[0].price)
+
+
+class TestGetProductStocksFromProductPrices(BaseTestCaseMixin):
+    """
+    Test case for GetProductStocksFromProductPrices
+    run: python -m unittest channel_app.omnitron.commands.tests.test_products.TestGetProductStocksFromProductPrices
+    """
+
+    def setUp(self) -> None:
+        self.stocks = [
+            MagicMock(
+                pk=3,
+                product=1,
+                stock=0,
+                stock_list=4,
+                unit_type='qty',
+                extra_field={},
+                sold_quantity_unreported=0,
+                modified_date='2023-12-19T08:38:48.476005Z',
+                created_date='2023-12-19T08:38:48.475992Z'
+            ),
+        ]
+        self.prices = [
+            MagicMock(
+                pk=1,
+                product=5,
+                price='645670668.11',
+                price_list=1,
+                currency_type='try',
+                tax_rate='32.61',
+                retail_price=None,
+                extra_field={},
+                discount_percentage='63.57',
+                modified_date='2024-01-02T07:53:06.392780Z',
+                created_date='2024-01-02T07:53:06.392771Z',
+                price_type='default',
+                failed_reason_type=FailedReasonType.channel_app.value
+            )
+        ]
+        self.get_product_stocks_from_product_prices = GetProductStocksFromProductPrices(
+            integration=self.mock_integration
+        )
+
+    @patch.object(BaseClient, 'get_instance')
+    @patch.object(GetProductStocksFromProductPrices, 'get_product_stock')
+    def test_get_data(self, mock_get_instance, mock_get_product_stock):
+        self.get_product_stocks_from_product_prices.objects = self.prices
+        self.assertEqual(
+            self.get_product_stocks_from_product_prices.get_data(),
+            self.prices
+        )
+
+    @patch.object(
+        BaseClient, 
+        'get_instance'
+    )
+    @patch.object(
+        GetProductStocksFromProductPrices, 
+        'create_batch_objects'
+    )
+    @patch.object(
+        GetProductStocksFromProductPrices, 
+        'create_integration_actions'
+    )
+    @patch.object(
+        GetProductStocksFromProductPrices, 
+        'update_batch_request'
+    )
+    def test_normalize_response(
+        self,
+        mock_update_batch_request,
+        mock_create_integration_actions,
+        mock_create_batch_objects,
+        mock_get_instance
+    ):
+        data = self.get_product_stocks_from_product_prices.normalize_response(
+            self.stocks,
+            None
+        )
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0].pk, self.stocks[0].pk)
+
+    @patch.object(GetProductStocksFromProductPrices, 'create_batch_objects')
+    def test_create_integration_actions(self, mock_create_batch_objects):
+        self.get_product_stocks_from_product_prices.create_integration_actions(
+            self.stocks,
+            []
+        )
+        self.assertEqual(mock_create_batch_objects.call_count, 1)
+
+    def test_get_product_stock_with_empty_stock(self):
+        self.stocks = []
+        stocks = self.get_product_stocks_from_product_prices.get_product_stock(
+            self.stocks
+        )
+        self.assertEqual(stocks, [])
+
+    @patch.object(BaseClient, 'get_instance')
+    @patch.object(ChannelExtraProductPriceEndpoint, 'list')
+    @patch.object(GetProductStocksFromProductPrices, 'get_stocks')
+    def test_get_product_stock(self, mock_get_stocks, mock_list, mock_get_instance):
+        mock_get_stocks.return_value = self.stocks
+        prices = self.get_product_stocks_from_product_prices.get_product_stock(
+            self.prices
+        )
+        self.assertEqual(len(prices), 1)
+        self.assertEqual(prices[0].pk, self.prices[0].pk)
+        self.assertEqual(prices[0].product, self.prices[0].product)
+        self.assertEqual(prices[0].price, self.prices[0].price)
+        self.assertEqual(prices[0].failed_reason_type, FailedReasonType.channel_app.value)
+
+    @patch.object(BaseClient, 'get_instance')
+    @patch.object(ChannelExtraProductPriceEndpoint, 'list')
+    def test_get_stocks(self, mock_list, mock_get_instance):
+        example_response = MagicMock()
+        example_response.list.return_value = self.stocks
+        example_response.iterator = iter(self.stocks)
+
+        with patch.object(
+            ChannelExtraProductStockEndpoint,
+            '__new__',
+            return_value=example_response
+        ):
+            stocks = self.get_product_stocks_from_product_prices.get_stocks(
+                "1,2,3",
+                ChannelExtraProductStockEndpoint()
+            )
+
+        self.assertEqual(len(stocks), 1)
+        self.assertEqual(stocks[0].pk, self.stocks[0].pk)
+        self.assertEqual(stocks[0].product, self.stocks[0].product)
+        self.assertEqual(stocks[0].stock, self.stocks[0].stock)
+
+
+class TestGetInsertedProductStocksFromExtraStockList(BaseTestCaseMixin):
+    """
+    Test case for GetInsertedProductStocksFromExtraStockList
+    run: python -m unittest channel_app.omnitron.commands.tests.test_products.TestGetInsertedProductStocksFromExtraStockList
+    """
+
+    def setUp(self) -> None:
+        self.get_inserted_product_stocks_from_extra_stock_list = GetInsertedProductStocksFromExtraStockList(
+            integration=self.mock_integration
+        )
+        self.sample_stocks = [
+            ProductStock(
+                pk=3,
+                product=1,
+                stock=0,
+                stock_list=4,
+                unit_type='qty',
+                extra_field={},
+                sold_quantity_unreported=0,
+                remote_id=3,
+                modified_date='2023-12-19T08:38:48.476005Z',
+                created_date='2023-12-19T08:38:48.475992Z'
+            ),
+            ProductStock(
+                pk=4,
+                product=2,
+                stock=0,
+                stock_list=4,
+                unit_type='qty',
+                extra_field={},
+                sold_quantity_unreported=0,
+                remote_id=4,
+                modified_date='2023-12-19T08:38:48.476005Z',
+                created_date='2023-12-19T08:38:48.475992Z'
+            )
+        ]
+        self.integration_actions = [
+            MagicMock(
+                pk=1,
+                channel=2,
+                content_type=ContentType.product_stock.value,
+                object_id=self.sample_stocks[0].pk,
+                remote_id=None,
+                version_date="2023-12-28T10:28:17.186730Z",
+                state={},
+                modified_date="2023-12-28T10:28:17.187032Z",
+                local_batch_id=None,
+                status=None,
+                created_date="2023-12-28T10:28:17.187014Z"
+            ),
+            MagicMock(
+                pk=2,
+                channel=2,
+                content_type=ContentType.product_stock.value,
+                object_id=self.sample_stocks[1].pk,
+                remote_id=None,
+                version_date="2023-12-28T10:28:17.186730Z",
+                state={},
+                modified_date="2023-12-28T10:28:17.187032Z",
+                local_batch_id=None,
+                status=None,
+                created_date="2023-12-28T10:28:17.187014Z"
+            )
+        ]
+
+    @patch.object(BaseClient, 'get_instance')
+    @patch.object(ChannelIntegrationActionEndpoint, 'list')
+    def test_get_integration_actions(self, mock_list, mock_get_instance):
+        example_response = MagicMock()
+        example_response.list.return_value = self.integration_actions
+        example_response.iterator = iter(self.integration_actions)
+
+        with patch.object(
+            ChannelIntegrationActionEndpoint,
+            '__new__',
+            return_value=example_response
+        ):
+            stocks = self.get_inserted_product_stocks_from_extra_stock_list.get_integration_actions(
+                self.sample_stocks
+            )
+
+        self.assertEqual(len(stocks), 2)
+        self.assertEqual(stocks[0].pk, self.integration_actions[0].object_id)
+        self.assertEqual(stocks[1].pk, self.integration_actions[1].object_id)
+        self.assertEqual(stocks[0].remote_id, self.sample_stocks[0].remote_id)
+        self.assertEqual(stocks[1].remote_id, self.sample_stocks[1].remote_id)
