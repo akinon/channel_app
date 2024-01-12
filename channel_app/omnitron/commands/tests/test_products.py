@@ -951,6 +951,7 @@ class TestGetUpdatedProductStocks(BaseTestCaseMixin):
     Test case for GetUpdatedProductStocks
     run: python -m unittest channel_app.omnitron.commands.tests.test_products.TestGetUpdatedProductStocks
     """
+
     def setUp(self) -> None:
         self.get_updated_product_stocks = GetUpdatedProductStocks(
             integration=self.mock_integration
@@ -1223,11 +1224,227 @@ class TestGetInsertedProductStocks(BaseTestCaseMixin):
         ]
 
         with patch.object(
-            ChannelIntegrationActionEndpoint,
-            '__new__',
-            return_value=example_response,
+                ChannelIntegrationActionEndpoint,
+                '__new__',
+                return_value=example_response,
         ):
             stocks = self.get_inserted_product_stocks.get_stocks_with_available(
+                self.sample_stocks
+            )
+
+        self.assertEqual(len(stocks), 2)
+        self.assertEqual(stocks[0].pk, self.sample_stocks[0].pk)
+        self.assertEqual(stocks[1].pk, self.sample_stocks[1].pk)
+
+
+class TestGetUpdatedProductStocksFromExtraStockList(BaseTestCaseMixin):
+    """
+    Test case for GetupdatedProductStocksFromExtraStockList
+    run: python -m unittest channel_app.omnitron.commands.tests.test_products.TestGetUpdatedProductStocksFromExtraStockList
+    """
+
+    def setUp(self) -> None:
+        self.get_updated_product_stocks_from_extra_stock_list = GetUpdatedProductStocksFromExtraStockList(
+            integration=self.mock_integration
+        )
+        self.sample_stocks = [
+            ProductStock(
+                pk=3,
+                product=1,
+                stock=0,
+                stock_list=4,
+                unit_type='qty',
+                extra_field={},
+                sold_quantity_unreported=0,
+                modified_date='2023-12-19T08:38:48.476005Z',
+                created_date='2023-12-19T08:38:48.475992Z'
+            ),
+            ProductStock(
+                pk=4,
+                product=2,
+                stock=0,
+                stock_list=4,
+                unit_type='qty',
+                extra_field={},
+                sold_quantity_unreported=0,
+                modified_date='2023-12-19T08:38:48.476005Z',
+                created_date='2023-12-19T08:38:48.475992Z'
+            )
+        ]
+        self.objects = self.sample_stocks
+        self.stock_list_id = 4
+
+    @patch.object(
+        BaseClient, 
+        'get_instance'
+    )
+    @patch.object(
+        GetUpdatedProductStocksFromExtraStockList, 
+        'get_product_stocks'
+    )
+    @patch.object(
+        GetUpdatedProductStocksFromExtraStockList, 
+        'get_integration_actions'
+    )
+    def test_get_data(
+        self,
+        mock_get_integration_actions,
+        mock_get_product_stocks,
+        mock_get_instance
+    ):
+        mock_get_integration_actions.return_value = self.sample_stocks
+        mock_get_product_stocks.return_value = self.sample_stocks
+        stocks = self.get_updated_product_stocks_from_extra_stock_list.get_data()
+
+        self.assertEqual(len(stocks), 2)
+        self.assertEqual(stocks[0].pk, self.sample_stocks[0].pk)
+        self.assertEqual(stocks[1].pk, self.sample_stocks[1].pk)
+
+    @patch.object(
+        BaseClient, 
+        'get_instance'
+    )
+    @patch.object(
+        ChannelIntegrationActionEndpoint, 
+        'list'
+    )
+    @patch.object(
+        GetUpdatedProductStocksFromExtraStockList, 
+        'create_batch_objects'
+    )
+    @patch.object(
+        GetUpdatedProductStocksFromExtraStockList, 
+        'update_batch_request'
+    )
+    def test_get_product_stocks(
+        self,
+        mock_update_batch_request,
+        mock_create_batch_objects,
+        mock_list,
+        mock_get_instance
+    ):
+        self.get_updated_product_stocks_from_extra_stock_list.objects = self.objects
+        self.get_updated_product_stocks_from_extra_stock_list.stock_list_id = self.stock_list_id
+
+        mock_endpoint = MagicMock()
+        mock_endpoint.list.return_value = [
+            {
+                'pk': 3,
+                'product': 1,
+                'stock': 0,
+                'stock_list': 4,
+                'unit_type': 'qty',
+                'extra_field': {},
+                'sold_quantity_unreported': 0,
+                'modified_date': '2023-12-19T08:38:48.476005Z',
+                'created_date': '2023-12-19T08:38:48.475992Z'
+            },
+            {
+                'pk': 4,
+                'product': 2,
+                'stock': 0,
+                'stock_list': 4,
+                'unit_type': 'qty',
+                'extra_field': {},
+                'sold_quantity_unreported': 0,
+                'modified_date': '2023-12-19T08:38:48.476005Z',
+                'created_date': '2023-12-19T08:38:48.475992Z'
+            }
+        ]
+
+        with patch.object(
+            ChannelExtraProductStockEndpoint,
+            '__new__',
+            return_value=mock_endpoint
+        ):
+            stocks = self.get_updated_product_stocks_from_extra_stock_list.get_product_stocks()
+
+        self.assertEqual(len(stocks), 2)
+        self.assertEqual(stocks[0].get('pk'), 3)
+        self.assertEqual(stocks[1].get('pk'), 4)
+
+    def test_get_integration_actions_without_stocks(self):
+        self.sample_stocks = []
+        stocks = self.get_updated_product_stocks_from_extra_stock_list.get_integration_actions(
+            self.sample_stocks
+        )
+        self.assertEqual(stocks, [])
+
+    @patch.object(BaseClient, 'get_instance')
+    @patch.object(ChannelIntegrationActionEndpoint, 'list')
+    def test_get_integration_actions(
+        self,
+        mock_get_instance,
+        mock_list
+    ):
+        mock_endpoint = MagicMock()
+        mock_endpoint.list.return_value = [
+            MagicMock(
+                pk=1,
+                channel=2,
+                content_type=ContentType.product_stock.value,
+                object_id=self.sample_stocks[0].pk,
+                remote_id=None,
+                version_date="2023-12-28T10:28:17.186730Z",
+                state={},
+                modified_date="2023-12-28T10:28:17.187032Z",
+                local_batch_id=None,
+                status=None,
+                created_date="2023-12-28T10:28:17.187014Z"
+            ),
+            MagicMock(
+                pk=2,
+                channel=2,
+                content_type=ContentType.product_stock.value,
+                object_id=self.sample_stocks[1].pk,
+                remote_id=None,
+                version_date="2023-12-28T10:28:17.186730Z",
+                state={},
+                modified_date="2023-12-28T10:28:17.187032Z",
+                local_batch_id=None,
+                status=None,
+                created_date="2023-12-28T10:28:17.187014Z"
+            )
+        ]
+        mock_endpoint.iterator = [
+            [
+                MagicMock(
+                    pk=1,
+                    channel=2,
+                    content_type=ContentType.product_stock.value,
+                    object_id=self.sample_stocks[0].pk,
+                    remote_id=None,
+                    version_date="2023-12-28T10:28:17.186730Z",
+                    state={},
+                    modified_date="2023-12-28T10:28:17.187032Z",
+                    local_batch_id=None,
+                    status=None,
+                    created_date="2023-12-28T10:28:17.187014Z"
+                )
+            ],
+            [
+                MagicMock(
+                    pk=2,
+                    channel=2,
+                    content_type=ContentType.product_stock.value,
+                    object_id=self.sample_stocks[1].pk,
+                    remote_id=None,
+                    version_date="2023-12-28T10:28:17.186730Z",
+                    state={},
+                    modified_date="2023-12-28T10:28:17.187032Z",
+                    local_batch_id=None,
+                    status=None,
+                    created_date="2023-12-28T10:28:17.187014Z"
+                )
+            ]
+        ]
+
+        with patch.object(
+            ChannelIntegrationActionEndpoint,
+            '__new__',
+            return_value=mock_endpoint
+        ):
+            stocks = self.get_updated_product_stocks_from_extra_stock_list.get_integration_actions(
                 self.sample_stocks
             )
 
