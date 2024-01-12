@@ -6,6 +6,7 @@ from omnisdk.omnitron.endpoints import (
     ChannelIntegrationActionEndpoint,
     ChannelProductCategoryEndpoint,
     ChannelProductEndpoint,
+    ChannelProductImageEndpoint,
     ChannelProductPriceEndpoint,
     ChannelProductStockEndpoint, 
     ChannelExtraProductStockEndpoint, 
@@ -14,12 +15,18 @@ from omnisdk.omnitron.endpoints import (
 from omnisdk.omnitron.models import (
     ChannelAttributeConfig, 
     ProductStock, 
-    ProductPrice
+    ProductPrice,
+    ProductImage,
 )
 
 from channel_app.core.commands import OmnitronCommandInterface
+from channel_app.core.data import ProductBatchRequestResponseDto
 from channel_app.core.tests import BaseTestCaseMixin
 from channel_app.omnitron.commands.batch_requests import GetBatchRequests
+from channel_app.omnitron.commands.product_images import (
+    GetInsertedProductImages, 
+    GetUpdatedProductImages,
+)
 from channel_app.omnitron.commands.product_prices import (
     GetInsertedProductPrices,
     GetInsertedProductPricesFromExtraPriceList, 
@@ -38,6 +45,7 @@ from channel_app.omnitron.commands.products import (
     GetDeletedProducts,
     GetInsertedProducts,
     GetUpdatedProducts,
+    ProcessProductBatchRequests,
     Product,
     GetMappedProducts,
     GetProductPrices,
@@ -2665,3 +2673,311 @@ class TestGetUpdatedProductPricesFromExtraPriceList(BaseTestCaseMixin):
             self.integration_actions[1].remote_id
         )
 
+
+class TestGetUpdatedProductImages(BaseTestCaseMixin):
+    """
+    Test case for GetUpdatedProductImages
+    run: python -m unittest channel_app.omnitron.commands.tests.test_products.TestGetUpdatedProductImages
+    """
+
+    def setUp(self) -> None:
+        self.get_updated_product_images = GetUpdatedProductImages(
+            integration=self.mock_integration
+        )
+        self.product_images = [
+            ProductImage(
+                pk=1,
+                product=7,
+                image='/media/products/2024/01/11/7/0aaa1bf0-8b4f-4b2c-b166-9d61d16879ce.jpg',
+                order=0,
+                source=None,
+                modified_date='2024-01-11T07:31:45.520043Z',
+                created_date='2024-01-11T07:31:45.520013Z',
+                height=56,
+                width=130,
+                hash=None,
+                status='active',
+                is_active=True
+            ),
+        ]
+        self.integration_actions = [
+            MagicMock(
+                pk=1,
+                channel=2,
+                content_type=ContentType.product_image.value,
+                object_id=self.product_images[0].pk,
+                remote_id='1',
+                version_date="2023-12-28T10:28:17.186730Z",
+                state={},
+                modified_date="2023-12-28T10:28:17.187032Z",
+                local_batch_id=None,
+                status=None,
+                created_date="2023-12-28T10:28:17.187014Z"
+            )
+        ]
+
+    @patch.object(GetUpdatedProductImages, 'get_product_images')
+    @patch.object(GetUpdatedProductImages, 'get_integration_actions')
+    def test_get_data(
+        self, 
+        mock_get_product_images, 
+        mock_get_integration_actions
+    ):
+        mock_get_product_images.return_value = self.product_images
+        mock_get_integration_actions.return_value = self.product_images
+        data = self.get_updated_product_images.get_data()
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0].pk, self.product_images[0].pk)
+
+    @patch.object(BaseClient, 'get_instance')
+    @patch.object(GetUpdatedProductImages, 'create_batch_objects')
+    @patch.object(GetUpdatedProductImages, 'update_batch_request')
+    def test_get_product_images(
+        self, 
+        mock_update_batch_request, 
+        mock_create_batch_objects, 
+        mock_get_instance
+    ):
+        example_response = MagicMock()
+        example_response.list.return_value = self.product_images
+
+        with patch.object(
+            ChannelProductImageEndpoint,
+            '__new__',
+            return_value=example_response
+        ):
+            data = self.get_updated_product_images.get_product_images()
+
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0].pk, self.product_images[0].pk)
+
+    @patch.object(BaseClient, 'get_instance')
+    def test_get_integration_actions(
+        self,
+        mock_get_instance
+    ):
+        example_response = MagicMock()
+        example_response.list.return_value = self.integration_actions
+        example_response.iterator = iter(self.integration_actions)
+
+        with patch.object(
+            ChannelIntegrationActionEndpoint,
+            '__new__',
+            return_value=example_response
+        ):
+            data = self.get_updated_product_images.get_integration_actions(
+                self.product_images
+            )
+
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0].pk, self.integration_actions[0].object_id)
+        self.assertEqual(
+            data[0].remote_id, 
+            self.integration_actions[0].remote_id
+        )
+
+
+class TestGetInsertedProductImages(BaseTestCaseMixin):
+    """
+    Test case for GetInsertedProductImages
+    run: python -m unittest channel_app.omnitron.commands.tests.test_products.TestGetInsertedProductImages
+    """
+
+    def setUp(self) -> None:
+        self.get_inserted_product_images = GetInsertedProductImages(
+            integration=self.mock_integration
+        )
+        self.product_images = [
+            ProductImage(
+                pk=1,
+                product=1,
+                image='/media/products/2024/01/11/7/0aaa1bf0-8b4f-4b2c-b166-9d61d16879ce.jpg',
+                order=0,
+                source=None,
+                modified_date='2024-01-11T07:31:45.520043Z',
+                created_date='2024-01-11T07:31:45.520013Z',
+                height=56,
+                width=130,
+                hash=None,
+                status='active',
+                is_active=True,
+                remote_id=None
+            ),
+        ]
+        self.integration_actions = [
+            MagicMock(
+                pk=1,
+                channel=2,
+                content_type=ContentType.product_image.value,
+                object_id=self.product_images[0].pk,
+                remote_id='1',
+                version_date="2023-12-28T10:28:17.186730Z",
+                state={},
+                modified_date="2023-12-28T10:28:17.187032Z",
+                local_batch_id=None,
+                status=None,
+                created_date="2023-12-28T10:28:17.187014Z"
+            )
+        ]
+
+    @patch.object(BaseClient, 'get_instance')
+    def test_get_integration_actions(self, mock_get_instance):
+        example_response = MagicMock()
+        example_response.list.return_value = self.integration_actions
+        example_response.iterator = iter(self.integration_actions)
+
+        with patch.object(
+            ChannelIntegrationActionEndpoint,
+            '__new__',
+            return_value=example_response
+        ):
+            data = self.get_inserted_product_images.get_integration_actions(
+                self.product_images
+            )
+
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0].pk, self.integration_actions[0].object_id)
+        self.assertEqual(
+            data[0].remote_id, 
+            self.integration_actions[0].remote_id
+        )
+
+    @patch.object(BaseClient, 'get_instance')
+    def test_get_integration_actions_with_not_in_product_case(
+        self, 
+        mock_get_instance
+    ):
+        self.product_images[0].product = 0
+        example_response = MagicMock()
+        example_response.list.return_value = self.integration_actions
+        example_response.iterator = iter(self.integration_actions)
+
+        with patch.object(
+            ChannelIntegrationActionEndpoint,
+            '__new__',
+            return_value=example_response
+        ):
+            data = self.get_inserted_product_images.get_integration_actions(
+                self.product_images
+            )
+
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0].pk, self.integration_actions[0].object_id)
+        self.assertEqual(
+            data[0].failed_reason_type, 
+            FailedReasonType.channel_app.value
+        )
+
+
+class TestProcessProductBatchRequests(BaseTestCaseMixin):
+    """
+    Test case for ProcessProductBatchRequests
+    run: python -m unittest channel_app.omnitron.commands.tests.test_products.TestProcessProductBatchRequests
+    """
+
+    def setUp(self) -> None:
+        self.process_product_batch_requests = ProcessProductBatchRequests(
+            integration=self.mock_integration
+        )
+        self.batch_requests = [
+            MagicMock(
+                pk=1,
+                channel=2,
+                local_batch_id='10147300-fe33-4c1f-a7c4-d2eb4001df70',
+                remote_batch_id=None,
+                status='initialized',
+                objects=None,
+                created_date='2024-01-11T08:12:11.481482Z',
+                modified_date='2024-01-11T08:12:11.481504Z'
+            ),
+        ]
+        self.sample_data = [
+            ProductBatchRequestResponseDto(
+                status='initialized',
+                sku='1',
+                remote_id=None,
+                message=None,
+            )
+        ]
+        self.not_correct_sample_data = [
+            {
+                "status": "initialized",
+                "sku": "1",
+                "remote_id": None,
+                "message": None,
+            }
+        ]
+
+    def test_validated_data(self):
+        data = self.process_product_batch_requests.validated_data(
+            self.sample_data
+        )
+        self.assertEqual(len(data), 1)
+
+    def test_validated_data_assertion_error(self):
+        with self.assertRaises(AssertionError):
+            self.process_product_batch_requests.validated_data(
+                self.not_correct_sample_data
+            )
+
+    @patch.object(ProcessProductBatchRequests, 'process_item')
+    def test_send(self, mock_process_item):
+        mock_process_item.return_value = 'result'
+        result = self.process_product_batch_requests.send(self.sample_data)
+        self.assertEqual(result, 'result')
+        mock_process_item.assert_called_once_with(self.sample_data)
+
+    @patch.object(ProcessProductBatchRequests, 'is_batch_request')
+    @patch.object(ProcessProductBatchRequests, 'batch_service')
+    def test_check_run_batch_request(
+        self,
+        mock_batch_service,
+        mock_is_batch_request
+    ):
+        mock_is_batch_request.return_value = True
+        self.process_product_batch_requests.integration.batch_request = MagicMock()
+
+        is_ok = False
+        formatted_data = 'formatted_data'
+        result = self.process_product_batch_requests.check_run(
+            is_ok,
+            formatted_data
+        )
+
+        self.assertFalse(result)
+        self.assertIsNone(
+            self.process_product_batch_requests.integration.batch_request.objects
+        )
+        mock_batch_service.assert_called_once_with(self.process_product_batch_requests.integration.channel_id)
+        mock_batch_service.return_value.to_fail.assert_called_once_with(
+            self.process_product_batch_requests.integration.batch_request
+        )
+
+    def test_update_state(self):
+        result = self.process_product_batch_requests.update_state
+        self.assertEqual(result, BatchRequestStatus.done)
+
+    @patch.object(ProcessProductBatchRequests, 'get_barcode')
+    def test_get_channel_items_by_reference_object_ids(self, mock_get_barcode):
+        mock_get_barcode.return_value = 'sku1'
+        channel_response = [
+            MagicMock(sku='sku1'),
+            MagicMock(sku='sku2')
+        ]
+        model_items_by_content = {
+            "product": {
+                1: Product(id=1, sku='sku1'),
+                2: Product(id=2, sku='sku2'),
+                3: Product(id=3, sku='sku3')
+            }
+        }
+        integration_actions = []
+
+        result = self.process_product_batch_requests.get_channel_items_by_reference_object_ids(
+            channel_response, model_items_by_content, integration_actions
+        )
+
+        self.assertEqual(len(result), 3)
+        self.assertIn(1, result)
+        self.assertIn(2, result)
+        self.assertEqual(result[1], channel_response[0])
