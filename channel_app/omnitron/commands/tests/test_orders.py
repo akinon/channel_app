@@ -1,10 +1,17 @@
+from dataclasses import asdict
 from unittest.mock import MagicMock, patch
 from omnisdk.base_client import BaseClient
-from omnisdk.omnitron.endpoints import ChannelOrderEndpoint
-from channel_app.core.data import OrderBatchRequestResponseDto
+from omnisdk.omnitron.endpoints import (
+    ChannelOrderEndpoint, 
+    ChannelCargoEndpoint, 
+    ChannelCustomerEndpoint,
+)
+from channel_app.core.data import CustomerDto, OrderBatchRequestResponseDto
 from channel_app.core.tests import BaseTestCaseMixin
+from channel_app.omnitron.commands.orders.cargo_companies import GetCargoCompany
+from channel_app.omnitron.commands.orders.customers import GetOrCreateCustomer
 from channel_app.omnitron.commands.orders.orders import ProcessOrderBatchRequests
-from channel_app.omnitron.constants import BatchRequestStatus
+from channel_app.omnitron.constants import BatchRequestStatus, CustomerIdentifierField
 
 
 class TestProcessOrderBatchRequests(BaseTestCaseMixin):
@@ -146,3 +153,240 @@ class TestProcessOrderBatchRequests(BaseTestCaseMixin):
         self.assertEqual(len(data), 1)
         self.assertEqual(len(data.get('order')), 2)
         
+
+class TestGetOrCreateCustomer(BaseTestCaseMixin):
+    """
+    Test case for GetOrCreateCustomer
+    
+    run: python -m unittest channel_app.omnitron.commands.tests.test_orders.TestGetOrCreateCustomer
+    """
+
+    def setUp(self) -> None:
+        self.instance = GetOrCreateCustomer(
+            integration=self.mock_integration,
+        )
+        self.instance.objects: CustomerDto = CustomerDto(
+            email="john.doe@akinon.com",
+            first_name="John",
+            last_name="Doe",
+            channel_code="1",
+            extra_field={},
+            phone_number="05556667788",
+            is_active=True,
+        )
+        self.customer_endpoint_response_data = {
+            'pk': 1, 
+            'channel': 1, 
+            'email': 'john.doe@akinon.com', 
+            'first_name': 'John', 
+            'last_name': 'Doe', 
+            'phone_number': 
+            '05556667788', 
+            'is_active': True, 
+            'channel_code': '1', 
+            'erp_code': None, 
+            'extra_field': {}, 
+            'modified_date': '2024-01-29T08:27:18.399594Z', 
+            'created_date': '2024-01-29T08:27:18.399484Z', 
+            'date_joined': None, 
+            'email_allowed': False, 
+            'sms_allowed': False, 
+            'call_allowed': False, 
+            'gender': None, 
+            'attributes': {}, 
+            'user_type': None, 
+            'date_of_birth': None, 
+            'attributes_kwargs': {}, 
+            'localized_attributes': {}, 
+            'localized_attributes_kwargs': {}
+        }
+        self.customer_endpoint_response = [
+            MagicMock(**self.customer_endpoint_response_data)
+        ]
+
+    @patch.object(GetOrCreateCustomer, 'get_customer')
+    def test_get_data(self, mock_get_customer):
+        mock_get_customer.return_value = [self.instance.objects]
+        data = self.instance.get_data()
+        
+        self.assertEqual(len(data), 1)
+
+        data = data[0]
+
+        for key, value in asdict(self.instance.objects).items():
+            self.assertEqual(getattr(data, key), value)
+
+    def test_get_customer_identifier_is_email(self):
+        self.instance.integration.channel.conf = {
+            "CUSTOMER_IDENTIFIER_FIELD": CustomerIdentifierField.email
+        }
+
+        response = MagicMock()
+        response.list.return_value = self.customer_endpoint_response
+
+        with patch.object(
+            ChannelCustomerEndpoint, 
+            '__new__', 
+            return_value=response
+        ):
+            customers = self.instance.get_customer(self.instance.objects)
+            self.assertEqual(len(customers), 1)
+
+            customer = customers[0]
+
+            for key, value in self.customer_endpoint_response_data.items():
+                self.assertEqual(getattr(customer, key), value)
+            
+
+    def test_get_customer_identifier_is_phone_number(self):
+        self.instance.integration.channel.conf = {
+            "CUSTOMER_IDENTIFIER_FIELD": CustomerIdentifierField.phone_number
+        }
+
+        response = MagicMock()
+        response.list.return_value = self.customer_endpoint_response
+
+        with patch.object(
+            ChannelCustomerEndpoint,
+            '__new__',
+            return_value=response
+        ):
+            customers = self.instance.get_customer(self.instance.objects)
+            self.assertEqual(len(customers), 1)
+
+            customer = customers[0]
+
+            for key, value in self.customer_endpoint_response_data.items():
+                self.assertEqual(getattr(customer, key), value)
+            
+    def test_get_customer_email_filter_incorrect_exception(self):
+        self.instance.integration.channel.conf = {
+            "CUSTOMER_IDENTIFIER_FIELD": CustomerIdentifierField.email
+        }
+
+        response = MagicMock()
+        response.list.return_value = [MagicMock()]
+
+        with patch.object(
+            ChannelCustomerEndpoint,
+            '__new__',
+            return_value=response
+        ):
+            with self.assertRaises(
+                Exception, 
+                msg="Customer email filter incorrect"
+            ):
+                self.instance.get_customer(self.instance.objects)
+
+    def test_get_customer_phone_number_filter_incorrect_exception(self):
+        self.instance.integration.channel.conf = {
+            "CUSTOMER_IDENTIFIER_FIELD": CustomerIdentifierField.phone_number
+        }
+
+        response = MagicMock()
+        response.list.return_value = [MagicMock()]
+
+        with patch.object(
+            ChannelCustomerEndpoint,
+            '__new__',
+            return_value=response
+        ):
+            with self.assertRaises(
+                Exception, 
+                msg="Customer phone_number filter incorrect"
+            ):
+                self.instance.get_customer(self.instance.objects)
+
+    def test_get_customer_must_update_case(self):
+        self.instance.integration.channel.conf = {
+            "CUSTOMER_IDENTIFIER_FIELD": CustomerIdentifierField.email
+        }
+
+        self.instance.objects.first_name = "Jenny"
+        self.instance.objects.last_name = "Doey"
+        
+        response = MagicMock()
+        response.list.return_value = self.customer_endpoint_response
+        response.update.return_value = MagicMock(
+            **self.customer_endpoint_response_data
+        )
+
+        with patch.object(
+            ChannelCustomerEndpoint,
+            '__new__',
+            return_value=response
+        ):
+            customers = self.instance.get_customer(self.instance.objects)
+            self.assertEqual(len(customers), 1)
+
+            customer = customers[0]
+
+            for key, value in self.customer_endpoint_response_data.items():
+                self.assertEqual(getattr(customer, key), value)
+
+
+class TestGetCargoCompany(BaseTestCaseMixin):
+    """
+    Test case for GetCargoCompany
+
+    run: python -m unittest channel_app.omnitron.commands.tests.test_orders.TestGetCargoCompany
+    """
+
+    def setUp(self) -> None:
+        self.instance = GetCargoCompany(
+            integration=self.mock_integration,
+        )
+        self.instance.objects = 'zyWpJvJdlqRaUfZMtdxgEnzslqXobZWxDGjtlQZtwQUnHtGkpJYzzJuoJhSVQIUW'
+        self.channel_cargo_endpoint_response_data = {
+            'pk': 1, 
+            'name': 
+            'ltLIdxIpZlyksSTPEGBytajaRazeShlCzrUZQBIteaHxQElXzQglgnZHZUyuzSqH', 
+            'erp_code': 'zyWpJvJdlqRaUfZMtdxgEnzslqXobZWxDGjtlQZtwQUnHtGkpJYzzJuoJhSVQIUW', 
+            'shipping_company': 'bringo_express', 
+            'modified_date': '2024-01-29T10:04:56.791090Z', 
+            'created_date': '2024-01-29T10:04:56.790945Z'
+        }
+        self.channel_cargo_endpoint_response = [
+            MagicMock(**self.channel_cargo_endpoint_response_data)
+        ]
+
+    def test_get_cargo_company(self):
+        cargo_company = self.instance.get_cargo_company(
+            self.channel_cargo_endpoint_response
+        )
+        self.assertEqual(cargo_company.erp_code, self.instance.objects)
+
+    def test_get_cargo_company_not_exists_exception(self):
+        self.instance.objects = 'not_exists_erp_code'
+
+        with self.assertRaises(
+            Exception, 
+            msg=f"CargoCompany does not exists: {self.instance.objects}"
+        ):
+            self.instance.get_cargo_company(
+                self.channel_cargo_endpoint_response
+            )
+
+    @patch.object(GetCargoCompany, 'get_cargo_company')
+    def test_get_data(self, mock_get_cargo_company):
+        mock_get_cargo_company.return_value = self.channel_cargo_endpoint_response[0]
+
+        response = MagicMock()
+        response.list.return_value = self.channel_cargo_endpoint_response
+        response.iterator = iter(self.channel_cargo_endpoint_response)
+
+        with patch.object(
+            ChannelCargoEndpoint,
+            '__new__',
+            return_value=response
+        ):
+            cargo_companies = self.instance.get_data()
+            self.assertEqual(len(cargo_companies), 1)
+
+            cargo_company = cargo_companies[0]
+
+            self.assertEqual(
+                cargo_company.erp_code, 
+                self.channel_cargo_endpoint_response_data['erp_code']
+            )
+            

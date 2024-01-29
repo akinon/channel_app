@@ -18,6 +18,7 @@ class PriceService(object):
                 content_type=ContentType.product_price.value) as omnitron_integration:
             product_prices = omnitron_integration.do_action(
                 key='get_updated_prices')
+            first_product_price_count = len(product_prices)
 
             if add_product_objects:
                 product_prices = product_prices and omnitron_integration.do_action(
@@ -30,6 +31,11 @@ class PriceService(object):
                     stock_list=omnitron_integration.catalog.stock_list)
 
             if not product_prices:
+                if first_product_price_count:
+                    omnitron_integration.batch_request.objects = None
+                    self.batch_service(omnitron_integration.channel_id).to_fail(
+                        omnitron_integration.batch_request
+                    )
                 return
 
             product_prices: List[ProductPrice]
@@ -70,6 +76,7 @@ class PriceService(object):
                 content_type=ContentType.product_price.value) as omnitron_integration:
             product_prices = omnitron_integration.do_action(
                 key='get_inserted_prices')
+            first_product_price_count = len(product_prices)
 
             if add_product_objects:
                 product_prices = product_prices and omnitron_integration.do_action(
@@ -82,6 +89,11 @@ class PriceService(object):
                     stock_list=omnitron_integration.catalog.stock_list)
 
             if not product_prices:
+                if first_product_price_count:
+                    omnitron_integration.batch_request.objects = None
+                    self.batch_service(omnitron_integration.channel_id).to_fail(
+                        omnitron_integration.batch_request
+                    )
                 return
 
             product_prices: List[ProductPrice]
@@ -127,6 +139,8 @@ class PriceService(object):
                 product_prices = omnitron_integration.do_action(
                     key='get_inserted_prices_from_extra_price_list',
                     objects=price_list_id)
+                first_product_price_count = len(product_prices)
+
                 if add_product_objects:
                     product_prices = product_prices and omnitron_integration.do_action(
                         key='get_product_objects', objects=product_prices)
@@ -169,6 +183,12 @@ class PriceService(object):
                         omnitron_integration.do_action(
                             key='process_price_batch_requests',
                             objects=response_data)
+                else:
+                    if first_product_price_count:
+                        omnitron_integration.batch_request.objects = None
+                        self.batch_service(omnitron_integration.channel_id).to_fail(
+                            omnitron_integration.batch_request
+                        )
 
     def update_product_prices_from_extra_price_list(self, is_sync=True,
                                                     is_success_log=True,
@@ -181,6 +201,7 @@ class PriceService(object):
                 product_prices = omnitron_integration.do_action(
                     key='get_updated_prices_from_extra_price_list',
                     objects=price_list_id)
+                first_product_price_count = len(product_prices)
                 if add_product_objects:
                     product_prices = product_prices and omnitron_integration.do_action(
                         key='get_product_objects', objects=product_prices)
@@ -223,7 +244,12 @@ class PriceService(object):
                         omnitron_integration.do_action(
                             key='process_price_batch_requests',
                             objects=response_data)
-
+                else:
+                    if first_product_price_count:
+                        omnitron_integration.batch_request.objects = None
+                        self.batch_service(omnitron_integration.channel_id).to_fail(
+                            omnitron_integration.batch_request
+                        )
     def get_price_batch_requests(self, is_success_log=True):
         with OmnitronIntegration(create_batch=False) as omnitron_integration:
             batch_request_data = omnitron_integration.do_action(

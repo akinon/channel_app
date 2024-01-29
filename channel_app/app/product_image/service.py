@@ -18,12 +18,17 @@ class ImageService(object):
                 content_type=ContentType.product_image.value) as omnitron_integration:
             product_images = omnitron_integration.do_action(
                 key='get_updated_images')
-
+            first_product_image_count = len(product_images)
             if add_product_objects:
                 product_images = product_images and omnitron_integration.do_action(
                     key='get_product_objects', objects=product_images)
 
             if not product_images:
+                if first_product_image_count:
+                    omnitron_integration.batch_request.objects = None
+                    self.batch_service(omnitron_integration.channel_id).to_fail(
+                        omnitron_integration.batch_request
+                    )
                 return
 
             product_images: List[ProductImage]
@@ -64,12 +69,18 @@ class ImageService(object):
                 content_type=ContentType.product_image.value) as omnitron_integration:
             product_images = omnitron_integration.do_action(
                 key='get_inserted_images')
+            first_product_image_count = len(product_images)
 
             if add_product_objects:
                 product_images = product_images and omnitron_integration.do_action(
                     key='get_product_objects', objects=product_images)
 
             if not product_images:
+                if first_product_image_count:
+                    omnitron_integration.batch_request.objects = None
+                    self.batch_service(omnitron_integration.channel_id).to_fail(
+                        omnitron_integration.batch_request
+                    )
                 return
 
             product_images: List[ProductImage]

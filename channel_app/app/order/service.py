@@ -176,12 +176,17 @@ class OrderService(object):
                 content_type=ContentType.order.value) as omnitron_integration:
             orders = omnitron_integration.do_action(key='get_orders')
             orders: List[Order]
-
+            first_order_count = len(orders)
             if add_order_items:
                 orders = orders and omnitron_integration.do_action(
                     key='get_order_items_with_order', objects=orders)
 
             if not orders:
+                if first_order_count:
+                    omnitron_integration.batch_request.objects = None
+                    self.batch_service(omnitron_integration.channel_id).to_fail(
+                        omnitron_integration.batch_request
+                    )
                 return
 
             response_data, reports, data = ChannelIntegration().do_action(
