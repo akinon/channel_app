@@ -28,7 +28,6 @@ class GetOrCreateCustomer(OmnitronCommandInterface):
                 if c.email != data.email:
                     raise Exception("Customer email filter incorrect")
         elif customer_identifier_field == CustomerIdentifierField.phone_number:
-            # TODO phone_number filter does not exist on customerfilter
             customers = self.endpoint(channel_id=self.integration.channel_id).list(params={
                 "phone_number": data.phone_number,
                 "channel": self.integration.channel_id
