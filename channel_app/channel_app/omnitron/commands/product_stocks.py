@@ -47,6 +47,9 @@ class GetUpdatedProductStocks(OmnitronCommandInterface):
         return stocks
 
     def get_stocks_with_available(self, stocks: List[ProductStock]):
+        if not stocks:
+            return []
+
         endpoint = ChannelIntegrationActionEndpoint(
             channel_id=self.integration.channel_id)
         stock_integration_actions = endpoint.list(
@@ -167,6 +170,9 @@ class GetInsertedProductStocks(GetUpdatedProductStocks):
     path = "inserts"
 
     def get_stocks_with_available(self, stocks: List[ProductStock]):
+        if not stocks:
+            return []
+
         endpoint = ChannelIntegrationActionEndpoint(
             channel_id=self.integration.channel_id)
         product_ids = [str(stock.product) for stock in stocks]
