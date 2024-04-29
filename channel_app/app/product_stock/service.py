@@ -18,7 +18,7 @@ class StockService(object):
                 content_type=ContentType.product_stock.value) as omnitron_integration:
             product_stocks = omnitron_integration.do_action(
                 key='get_updated_stocks')
-
+            first_product_stock_count = len(product_stocks)
             if add_product_objects:
                 product_stocks = product_stocks and omnitron_integration.do_action(
                     key='get_product_objects', objects=product_stocks)
@@ -30,6 +30,12 @@ class StockService(object):
                     stock_list=omnitron_integration.catalog.price_list)
 
             if not product_stocks:
+                # TODO: Move this part under batch service
+                if first_product_stock_count:
+                    omnitron_integration.batch_request.objects = None
+                    self.batch_service(omnitron_integration.channel_id).to_fail(
+                        omnitron_integration.batch_request
+                    )
                 return
 
             product_stocks: List[ProductStock]
@@ -74,7 +80,7 @@ class StockService(object):
                 product_stocks = omnitron_integration.do_action(
                     key='get_updated_stocks_from_extra_stock_list',
                     objects=stock_list_id)
-
+                first_product_stock_count = len(product_stocks)
                 if add_product_objects:
                     product_stocks = product_stocks and omnitron_integration.do_action(
                         key='get_product_objects', objects=product_stocks)
@@ -86,6 +92,11 @@ class StockService(object):
                         stock_list=omnitron_integration.catalog.price_list)
 
                 if not product_stocks:
+                    if first_product_stock_count:
+                        omnitron_integration.batch_request.objects = None
+                        self.batch_service(omnitron_integration.channel_id).to_fail(
+                            omnitron_integration.batch_request
+                        )
                     return
 
                 product_stocks: List[ProductStock]
@@ -130,7 +141,7 @@ class StockService(object):
                 product_stocks = omnitron_integration.do_action(
                     key='get_inserted_stocks_from_extra_stock_list',
                     objects=stock_list_id)
-
+                first_product_stock_count = len(product_stocks)
                 if add_product_objects:
                     product_stocks = product_stocks and omnitron_integration.do_action(
                         key='get_product_objects', objects=product_stocks)
@@ -142,6 +153,11 @@ class StockService(object):
                         stock_list=omnitron_integration.catalog.price_list)
 
                 if not product_stocks:
+                    if first_product_stock_count:
+                        omnitron_integration.batch_request.objects = None
+                        self.batch_service(omnitron_integration.channel_id).to_fail(
+                            omnitron_integration.batch_request
+                        )
                     return
 
                 product_stocks: List[ProductStock]
@@ -181,6 +197,7 @@ class StockService(object):
                 content_type=ContentType.product_stock.value) as omnitron_integration:
             product_stocks = omnitron_integration.do_action(
                 key='get_inserted_stocks')
+            first_product_stock_count = len(product_stocks)
 
             if add_product_objects:
                 product_stocks = product_stocks and omnitron_integration.do_action(
@@ -193,6 +210,11 @@ class StockService(object):
                     stock_list=omnitron_integration.catalog.price_list)
 
             if not product_stocks:
+                if first_product_stock_count:
+                    omnitron_integration.batch_request.objects = None
+                    self.batch_service(omnitron_integration.channel_id).to_fail(
+                        omnitron_integration.batch_request
+                    )
                 return
 
             product_stocks: List[ProductStock]
