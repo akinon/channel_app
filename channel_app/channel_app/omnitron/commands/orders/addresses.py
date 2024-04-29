@@ -201,7 +201,7 @@ class GetOrCreateAddress(OmnitronCommandInterface):
         endpoint = ChannelCityEndpoint(channel_id=self.integration.channel_id)
 
         params = {
-            "name__exact": city_name,
+            "name__iexact": city_name,
             "country": country.pk,
             "is_active": True
         }
@@ -226,7 +226,7 @@ class GetOrCreateAddress(OmnitronCommandInterface):
         endpoint = ChannelTownshipEndpoint(channel_id=self.integration.channel_id)
 
         params = {
-            "name__exact": township_name,
+            "name__iexact": township_name,
             "country": country.pk,
             "city": city.pk,
             "is_active": True
