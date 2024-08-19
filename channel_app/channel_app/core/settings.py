@@ -1,5 +1,7 @@
 import importlib
 import os
+from dotenv import load_dotenv
+load_dotenv()
 
 env_variables = os.environ
 
@@ -21,8 +23,8 @@ DEFAULT_CONNECTION_POOL_MAX_SIZE = os.getenv("DEFAULT_CONNECTION_POOL_COUNT") or
 DEFAULT_CONNECTION_POOL_RETRY = os.getenv("DEFAULT_CONNECTION_POOL_RETRY") or 0
 REQUEST_LOG = os.getenv("REQUEST_LOG") or False
 
-omnitron_module = importlib.import_module(os.environ.get("OMNITRON_MODULE"))
+omnitron_module = importlib.import_module(os.getenv("OMNITRON_MODULE"))
 OmnitronIntegration = omnitron_module.OmnitronIntegration
 
-channel_module = importlib.import_module(os.environ.get("CHANNEL_MODULE"))
+channel_module = importlib.import_module(os.getenv("CHANNEL_MODULE"))
 ChannelIntegration = channel_module.ChannelIntegration

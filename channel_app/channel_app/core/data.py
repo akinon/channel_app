@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import List, Optional
 
-from channel_app.omnitron.constants import ResponseStatus, \
+from channel_app.omnitron.constants import CancellationType, ResponseStatus, \
     ChannelConfSchemaDataTypes
 
 
@@ -195,6 +195,14 @@ class CancelOrderDto:
 
 
 @dataclass
+class CancellationRequestDto:
+    order_item: str  # remote item number
+    reason: str      # reason code
+    remote_id: str
+    cancellation_type: Optional[str] = "cancel"
+
+
+@dataclass
 class CustomerDto:
     email: str  # "john.doe@akinon.com"
     first_name: str  # "John"
@@ -254,3 +262,13 @@ class ChannelUpdateOrderItemDto:
     invoice_date: Optional[str] = None
     tracking_number: Optional[str] = None
     extra_field: Optional[dict] = None
+
+
+@dataclass
+class ChannelCancellationRequestDto:
+    cancellation_type: CancellationType  # cancel, refund
+    status: str  # confirmed, waiting_approval, approved, rejected, completed
+    order_item: str  # omnitron order item remote id
+    reason: str  # omnitron reason code
+    description: Optional[str]  # description for refund
+    remote_id: Optional[str]  # remote id for cancellation request

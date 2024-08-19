@@ -18,6 +18,8 @@ from channel_app.omnitron.commands.orders.customers import GetOrCreateCustomer
 from channel_app.omnitron.commands.orders.orders import (
     CreateOrders,
     CreateOrderShippingInfo,
+    GetCancellationRequestUpdates,
+    CreateCancellationRequest,
     GetOrders,
     ProcessOrderBatchRequests,
     CreateOrderCancel,
@@ -135,6 +137,8 @@ class OmnitronIntegration(BaseIntegration):
         "get_product_objects": GetProductObjects,
         "get_product_from_batch_request": GetProductsFromBatchrequest,
         "get_cancellation_requests": GetCancellationRequest,
+        "get_cancellation_requests_update": GetCancellationRequestUpdates,
+        "create_cancellation_requests": CreateCancellationRequest,
         "update_order_items": UpdateOrderItems
         # "fetch_cancellation_plan": FetchCancellationPlan
     }

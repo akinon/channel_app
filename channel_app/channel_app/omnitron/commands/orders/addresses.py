@@ -69,7 +69,7 @@ class GetOrCreateAddress(OmnitronCommandInterface):
             "district": district_pk,
             "title": address.title and address.title[:128],
             "line": address.line[:255],
-            "postcode": address.postcode[:64],
+            "postcode": address.postcode and address.postcode[:64],
             "notes": address.notes and address.notes[:512],
             "company_name": address.company_name and address.company_name[:255],
             "tax_office": address.tax_office and address.tax_office[:64],
@@ -187,6 +187,10 @@ class GetOrCreateAddress(OmnitronCommandInterface):
         countries = endpoint.list(params=params)
         if len(countries) == 1:
             return countries[0]
+        params = {"name__exact": country_code, "is_active": True}
+        countries = endpoint.list(params=params)
+        if len(countries) == 1:
+            return countries[0]        
         try:
             countries = self.get_mapping_object(country_code, endpoint)
         except IntegrationMappingException as exc:

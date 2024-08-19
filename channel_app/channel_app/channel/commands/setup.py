@@ -1006,6 +1006,11 @@ class GetChannelConfSchema(ChannelCommandInterface):
                 data_type=ChannelConfSchemaDataTypes.text,
                 key="setting_name_2",
                 label="setting_name_2"),
+            "reason_mapping": ChannelConfSchemaField(
+                required=True,
+                data_type=ChannelConfSchemaDataTypes.json,
+                key="reason_mapping",
+                label="reason_mapping"),
         }
 
         return schema, None, None
