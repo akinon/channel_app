@@ -6,13 +6,23 @@ from omnisdk.omnitron.endpoints import (
     ChannelCustomerEndpoint,
     ChannelOrderEndpoint,
     ChannelOrderItemEndpoint,
-)
-from channel_app.core.data import CustomerDto, OrderBatchRequestResponseDto
+    ChannelCancellationRequestEndpoint)
+from omnisdk.omnitron.models import CancellationRequest
+
+from channel_app.core.data import CancellationRequestDto, CustomerDto, OrderBatchRequestResponseDto
 from channel_app.core.tests import BaseTestCaseMixin
 from channel_app.omnitron.commands.orders.cargo_companies import GetCargoCompany
 from channel_app.omnitron.commands.orders.customers import GetOrCreateCustomer
-from channel_app.omnitron.commands.orders.orders import GetOrderItems, GetOrderItemsWithOrder, ProcessOrderBatchRequests
-from channel_app.omnitron.constants import BatchRequestStatus, CustomerIdentifierField
+from channel_app.omnitron.commands.orders.orders import (
+    CreateCancellationRequest,
+    GetCancellationRequestUpdates, 
+    GetOrderItems, 
+    GetOrderItemsWithOrder, 
+    ProcessOrderBatchRequests)
+from channel_app.omnitron.constants import (
+    BatchRequestStatus,
+    CancellationType, 
+    CustomerIdentifierField)
 
 
 class TestProcessOrderBatchRequests(BaseTestCaseMixin):
@@ -482,3 +492,117 @@ class TestGetOrderItemsWithOrder(BaseTestCaseMixin):
 
         self.assertEqual(len(orders), 1)
         self.assertEqual(len(orders[0].orderitem_set), 2)
+
+class TestGetCancellationRequestUpdates(BaseTestCaseMixin):
+    """
+    Test case for GetCancellationRequestUpdates
+    run: python -m unittest channel_app.omnitron.commands.tests.test_orders.GetCancellationRequestUpdates
+    """
+
+    def setUp(self) -> None:
+        self.instance = GetCancellationRequestUpdates(
+            integration=self.mock_integration,
+        )
+       
+        self.instance.objects = {
+            'status': 'completed',
+            'cancellation_type': 'refund'
+        }
+        self.endpoint = ChannelCancellationRequestEndpoint
+        self.cancellation_request = MagicMock(
+                pk=1,
+                status='completed',
+                cancellation_type='refund',
+                easy_return=None,
+                order_item=1,
+            )
+        return super().setUp()
+
+    @patch.object(BaseClient, 'get_instance')
+    @patch.object(ChannelCancellationRequestEndpoint, '_list')
+    def test_get_data(self, mock_endpoint, mock_get_instance):
+        response_data = [
+                MagicMock(
+                pk=1,
+                status='completed',
+                cancellation_type=CancellationType.refund.value,
+                easy_return=None,
+                order_item=1,
+            ),
+                MagicMock(
+                pk=2,
+                status='completed',
+                cancellation_type=CancellationType.refund.value,
+                easy_return=None,
+                order_item=2,
+            )
+        ]
+        response = MagicMock()
+        response.list.return_value = response_data
+        with patch.object(self.endpoint, '__new__', return_value=response):
+            data = self.instance.get_data()
+            self.assertEqual(len(data), 2)
+            self.assertEqual(data[0].status, self.instance.objects['status'])
+
+    @patch.object(GetCancellationRequestUpdates, 'get_cancellation_requests')
+    def test_update_cancellation_request(self, mock_get_cancellation_requests):
+        mock_get_cancellation_requests.return_value = self.cancellation_request
+        self.instance.get_cancellation_requests(self.cancellation_request)
+        self.assertEqual(self.cancellation_request.status, self.instance.objects['status'])
+        self.assertEqual(self.cancellation_request.cancellation_type, self.instance.objects['cancellation_type'])
+
+
+class TestCreateCancellationRequest(BaseTestCaseMixin):
+    """
+    Test case for CreateCancellationRequest
+    run: python -m unittest channel_app.omnitron.commands.tests.test_orders.TestCreateCancellationRequest
+    """
+
+    def setUp(self) -> None:
+        self.instance = CreateCancellationRequest(
+            integration=self.mock_integration)
+
+        self.endpoint = ChannelCancellationRequestEndpoint
+        self.instance.objects = CancellationRequestDto(
+            order_item='1',
+            reason='reason_code',
+            remote_id='2',
+            cancellation_type=CancellationType.refund.value)
+        return super().setUp()
+
+    @patch.object(BaseClient, 'get_instance')
+    def test_get_data(self, mock_get_instance):
+        response_data = CancellationRequest(
+                pk=1,
+                status='waiting',
+                cancellation_type='refund',
+                easy_return=None,
+                order_item=1,
+            )
+        response = MagicMock()
+        response.create.return_value = response_data
+        with patch.object(self.endpoint, '__new__', return_value=response):
+            data = self.instance.get_data()
+            self.assertIsInstance(data, dict)
+
+    @patch.object(BaseClient, 'get_instance')
+    @patch.object(ChannelCancellationRequestEndpoint, 'create')
+    def test_create_cancellation_request(self, mock_create, mock_get_instance):
+        response_data = CancellationRequest(
+                pk=1,
+                status='waiting',
+                cancellation_type='refund',
+                easy_return=None,
+                order_item=1,
+                modified_date='2024-01-29T08:27:18.399594Z',
+                created_date='2024-01-29T08:27:18.399484Z',
+            )
+        response = MagicMock()
+        response.create.return_value = response_data
+        with patch.object(self.endpoint, '__new__', return_value=response):
+            self.instance.integration.channel_id = "1"
+            self.instance.integration.batch_request.content_type = 'cancellationrequest'
+            data = self.instance.run()
+            self.assertIsInstance(data, list)
+            self.assertNotEqual(len(data), 0)
+            self.assertEqual(data[0].remote_id, '2')

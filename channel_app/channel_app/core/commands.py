@@ -11,7 +11,7 @@ from channel_app.core.data import ErrorReportDto
 from channel_app.core.integration import BaseIntegration
 from channel_app.omnitron.batch_request import ClientBatchRequest
 from channel_app.omnitron.constants import BatchRequestStatus, ContentType
-from channel_app.omnitron.exceptions import (CountryException, CityException,
+from channel_app.omnitron.exceptions import (AppException, CityException,
                                              TownshipException,
                                              DistrictException)
 
@@ -106,17 +106,24 @@ class ChannelCommandInterface(CommandInterface):
         if not self.is_batch_request:
             return
         name = self.__class__.__name__
+        if isinstance(response, Response):
+            raw_request = f"{response.request.method}-"
+            f"{response.request.url}-"
+            f"{response.request.body}"
+            raw_response = response.text
+        else:
+            raw_request = str("")
+            raw_response = str(response)
+        
         report_list = []
         report = ErrorReportDto(
             action_content_type=ContentType.batch_request.value,
             action_object_id=self.batch_request.pk,
             modified_date=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            error_code=f"{self.batch_request.local_batch_id}-{name}-{datetime.now().timestamp()}",
-            error_description=f"{self.batch_request.local_batch_id}-{name}",
-            raw_request=f"{response.request.method}-"
-                        f"{response.request.url}-"
-                        f"{response.request.body}",
-            raw_response=f"{response.text}"
+            error_code=f"{self.batch_request.local_batch_id}-Channel-{name}-{datetime.now().timestamp()}",
+            error_description=f"{name}",
+            raw_request=raw_request,
+            raw_response=raw_response
         )
         is_ok = self.check_response_is_ok(response=response)
         if is_ok:
@@ -130,7 +137,7 @@ class ChannelCommandInterface(CommandInterface):
                 action_object_id=failed_obj[0].pk,
                 modified_date=failed_obj[0].modified_date,
                 error_code=f"{self.batch_request.local_batch_id}-{name}-{datetime.now().timestamp()}",
-                error_description=f"{self.batch_request.local_batch_id}-{name}",
+                error_description=f"{name}",
                 raw_request="",
                 raw_response=f"{failed_obj[0].failed_reason_type}-{failed_obj[2]}",
                 is_ok=False
@@ -139,7 +146,10 @@ class ChannelCommandInterface(CommandInterface):
         return report_list
 
     def check_response_is_ok(self, response):
-        if str(response.status_code).startswith("2"):
+        is_response_obj = isinstance(response, Response)
+        if is_response_obj and str(response.status_code).startswith("2"):
+            return True
+        elif not is_response_obj and response:
             return True
         return False
 
@@ -209,14 +219,14 @@ class OmnitronCommandInterface(CommandInterface):
             raw_response = e.response.text
             is_ok = False
             logger.error(f"{raw_request}-/-{raw_response}")
-        except CountryException as e:
-            is_ok = False
-            raw_response = str(e.params)
         except (CityException, TownshipException, DistrictException) as e:
             is_ok = False
             self.integration.do_action(
                 key='create_address_error_report',
                 objects=e.params)
+            raw_response = str(e.params)
+        except AppException as e:
+            is_ok = False
             raw_response = str(e.params)
         except Exception as e:
             is_ok = False
@@ -225,7 +235,6 @@ class OmnitronCommandInterface(CommandInterface):
             if request:
                 raw_request = f"{request.method} - {request.url} - {request.body}"
             logger.error(f"{raw_request}-/-{raw_response}")
-
         finally:
             if not is_ok:
                 self.send_error_report(raw_request, raw_response)
@@ -258,8 +267,8 @@ class OmnitronCommandInterface(CommandInterface):
                 action_content_type=failed_obj[1],
                 action_object_id=failed_obj[0].pk,
                 modified_date=failed_obj[0].modified_date,
-                error_code=f"{self.integration.batch_request.local_batch_id}-{name}",
-                error_description=f"{self.integration.batch_request.local_batch_id}-{name}",
+                error_code=f"{self.integration.batch_request.local_batch_id}-Omnitron-{name}",
+                error_description=f"Omnitron-{name}",
                 raw_request="",
                 raw_response=f"{failed_obj[0].failed_reason_type}-{failed_obj[2]}",
                 is_ok=False
@@ -278,7 +287,7 @@ class OmnitronCommandInterface(CommandInterface):
             action_object_id=self.integration.batch_request.pk,
             modified_date=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             error_code=f"{self.integration.batch_request.local_batch_id}-{name}-{datetime.now().microsecond}",
-            error_description=f"{self.integration.batch_request.local_batch_id}-{name}",
+            error_description=f"Omnitron-{name}",
             raw_request=raw_request,
             raw_response=raw_response
         )
