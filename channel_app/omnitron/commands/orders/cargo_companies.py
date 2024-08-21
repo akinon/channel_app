@@ -4,6 +4,7 @@ from omnisdk.omnitron.endpoints import ChannelCargoEndpoint
 from omnisdk.omnitron.models import CargoCompany
 
 from channel_app.core.commands import OmnitronCommandInterface
+from channel_app.omnitron.exceptions import CargoCompanyException
 
 
 class GetCargoCompany(OmnitronCommandInterface):
@@ -14,7 +15,7 @@ class GetCargoCompany(OmnitronCommandInterface):
         for cargo_company in data:
             if cargo_company.erp_code == cargo_company_code:
                 return cargo_company
-        raise Exception("CargoCompany does not exists: {}".format(
+        raise CargoCompanyException("CargoCompany does not exists: {}".format(
             cargo_company_code))
 
     def get_data(self) -> List[CargoCompany]:

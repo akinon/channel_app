@@ -1,5 +1,7 @@
 from dataclasses import asdict
-from typing import List
+from typing import Any, List
+
+from requests import exceptions as requests_exceptions
 
 from omnisdk.omnitron.endpoints import (ChannelCreateOrderEndpoint,
                                         ChannelIntegrationActionEndpoint,
@@ -15,12 +17,13 @@ from omnisdk.omnitron.models import Order, OrderShippingInfo, \
 from channel_app.core.commands import OmnitronCommandInterface
 from channel_app.core.data import (OrderBatchRequestResponseDto,
                                    OmnitronCreateOrderDto, OmnitronOrderDto,
-                                   OrderItemDto, CancelOrderDto, ErrorReportDto)
+                                   OrderItemDto, CancelOrderDto, 
+                                   CancellationRequestDto)
 from channel_app.core.utilities import split_list
 from channel_app.omnitron.batch_request import ClientBatchRequest
 from channel_app.omnitron.commands.batch_requests import ProcessBatchRequests
 from channel_app.omnitron.constants import (ContentType, BatchRequestStatus)
-from channel_app.omnitron.exceptions import OrderException
+from channel_app.omnitron.exceptions import AppException, OrderException
 
 
 class GetOrders(OmnitronCommandInterface):
@@ -227,10 +230,12 @@ class CreateOrders(OmnitronCommandInterface):
 
         except OrderException:
             return is_order_exists
-
-        order = self.endpoint(
-            channel_id=self.integration.channel_id
-        ).create(item=order_obj)
+        try:
+            order = self.endpoint(
+                channel_id=self.integration.channel_id
+            ).create(item=order_obj)
+        except requests_exceptions.HTTPError as exc:
+            raise OrderException(params=exc.response.text)
 
         self._update_batch_request(order)
         return order
@@ -274,6 +279,9 @@ class CreateOrders(OmnitronCommandInterface):
         for item in order_items:
             price_list = self.integration.catalog.price_list
             stock_list = self.integration.catalog.stock_list
+            if item.product not in product_dict:
+                raise AppException(
+                    "Product not found: remote_id={}".format(item.product))
             order_item_data = {
                 "product": product_dict[item.product],
                 "status": item.status or "400",
@@ -488,7 +496,7 @@ class GetCancellationRequest(OmnitronCommandInterface):
 
     def get_data(self):
         """
-        {"status": "approved", "cancellation_type": "refund or cancel", "order_item": 3212}
+        {"status": "approved", "cancellation_type": "refund or cancel"}
         """
         assert isinstance(self.objects, dict)
         query_params = self.objects
@@ -504,8 +512,125 @@ class GetCancellationRequest(OmnitronCommandInterface):
             if not batch:
                 break
             cancellation_requests.extend(batch)
+        
+        objects_data = self.create_batch_objects(
+            data=cancellation_requests, content_type=self.content_type)
+        self.update_batch_request(objects_data=objects_data)
+                
+        return cancellation_requests
+    
+    def check_run(self, is_ok, formatted_data):
+        if not is_ok:
+            return False
+        return True
+
+
+class GetCancellationRequestUpdates(GetCancellationRequest):
+    endpoint = ChannelCancellationRequestEndpoint
+    path = "updates"
+
+    def get_cancellation_requests(self, query_params={}) -> List[CancellationRequest]:
+        endpoint = self.endpoint(channel_id=self.integration.channel_id,
+                                 path=self.path)
+        cancellation_requests = endpoint.list(params=query_params)
+        for batch in endpoint.iterator:
+            if not batch:
+                break
+            cancellation_requests.extend(batch)
+        
+        for cr in cancellation_requests:
+            cr.pk = cr.id
+            
+        objects_data = self.create_batch_objects(
+            data=cancellation_requests, content_type=self.content_type)
+        self.update_batch_request(objects_data=objects_data)
         return cancellation_requests
 
+    def check_run(self, is_ok, formatted_data):
+        if not is_ok:
+            return False
+        return True
+
+
+class CreateCancellationRequest(OmnitronCommandInterface):
+    endpoint = ChannelCancellationRequestEndpoint
+
+    def get_data(self):
+        assert isinstance(self.objects, CancellationRequestDto)
+        cancellation_request = self.objects
+        # omnitron donusumleri yapilir.
+        omnitron_reason = self.get_omnitron_reason(cancellation_request.reason)
+        # omnitron reason
+        cancellation_request.reason = omnitron_reason
+        # remote_id
+        cancellation_request.remote_id = cancellation_request.remote_id
+        # omnitron order_item
+        omnitron_order_item = self.get_omnitron_order_item(cancellation_request.order_item)
+        cancellation_request.order_item = omnitron_order_item
+        
+        data = asdict(cancellation_request)
+        return CancellationRequest(**data)
+    
+    def send(self, validated_data) -> CancellationRequest:
+        """
+        :param validated_data: data for order
+        :return: cancellationrequest objects
+        """
+        endpoint = self.endpoint(channel_id=self.integration.channel_id)
+
+        response_cancellation_request = endpoint.create(item=validated_data)
+        response_cancellation_request.remote_id = validated_data.remote_id
+        response_cancellation_request.pk = response_cancellation_request.id
+        objects_data = self.create_batch_objects(
+            data=[response_cancellation_request], 
+            content_type=ContentType.cancellation_request.value)
+        
+        self.update_batch_request(objects_data=objects_data)
+        return response_cancellation_request
+    
+    def normalize_response(self, data, response) -> List[object]:
+        return [response]
+    
+    def check_run(self, is_ok, formatted_data):
+        if not is_ok:
+            return False
+        return True
+
+    def get_omnitron_order_item(self, channel_order_item):
+        """
+        order_item_remote_id -> omnitron orderitem remote_id str
+        :return: int
+        """
+        end_point = ChannelIntegrationActionEndpoint(
+            channel_id=self.integration.channel_id)
+        
+        params = {"channel": self.integration.channel_id,
+                  "content_type_name": ContentType.order_item.value,
+                  "remote_id__exact": channel_order_item,
+                  "sort": "id"}
+        integration_actions = end_point.list(params=params)
+        for item in end_point.iterator:
+            if not item:
+                break
+            integration_actions.extend(item)
+
+        if not integration_actions:
+            raise AppException(
+                "OrderItem not found, number={}".format(
+                    channel_order_item))
+        if len(integration_actions) != 1:
+            raise AppException("Multiple records returned from Omnitron "
+                               "for a single order item: remote_id: {}".format(
+                                   channel_order_item))
+        return integration_actions[0].object_id
+            
+    def get_omnitron_reason(self, channel_reason):
+        configuration = self.integration.channel.conf
+        omnitron_reason = configuration.get("reason_mapping", {}).get(channel_reason)
+        if omnitron_reason:
+            return omnitron_reason
+        return 10
+    
 
 class UpdateOrderItems(OmnitronCommandInterface):
     endpoint = ChannelOrderItemEndpoint

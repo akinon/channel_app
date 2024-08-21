@@ -96,3 +96,8 @@ class ChannelConfSchemaDataTypes:
     json = 'json'
     list = 'list'
     integer = 'integer'
+
+
+class CancellationType(Enum):
+    cancel = "cancel"
+    refund = "refund"
