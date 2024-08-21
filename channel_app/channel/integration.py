@@ -1,8 +1,8 @@
 import requests
 
 from channel_app.channel.commands.orders.orders import (
-    GetOrders, CheckOrders, SendUpdatedOrders, GetCancelledOrders,
-    GetUpdatedOrderItems)
+    GetCancellationRequests, GetOrders, CheckOrders, SendUpdatedOrders, 
+    GetCancelledOrders, GetUpdatedOrderItems, UpdateCancellationRequest)
 from channel_app.channel.commands.product_images import (
     SendUpdatedImages, SendInsertedImages, CheckImages)
 from channel_app.channel.commands.product_prices import (
@@ -49,7 +49,9 @@ class ChannelIntegration(BaseIntegration):
         "get_updated_order_items": GetUpdatedOrderItems,
         "send_updated_orders": SendUpdatedOrders,
         "check_orders": CheckOrders,
-        "get_cancelled_orders": GetCancelledOrders
+        "get_cancelled_orders": GetCancelledOrders,
+        "get_cancellation_requests": GetCancellationRequests,
+        "update_cancellation_request": UpdateCancellationRequest,
     }
 
     def __init__(self):

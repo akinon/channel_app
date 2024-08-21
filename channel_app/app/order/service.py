@@ -1,18 +1,27 @@
 from dataclasses import asdict
 from typing import List, Generator, Union
 
+from requests import exceptions as requests_exceptions
+
 from omnisdk.omnitron.models import (Customer, Address, CargoCompany, Order,
-                                     BatchRequest)
+                                     BatchRequest, CancellationRequest)
+from omnisdk.omnitron.endpoints import ChannelIntegrationActionEndpoint
 
 from channel_app.core import settings
-from channel_app.core.data import (OmnitronCreateOrderDto, OmnitronOrderDto,
+from channel_app.core.data import (BatchRequestResponseDto, 
+                                   CancellationRequestDto, 
+                                   ChannelCancellationRequestDto, 
+                                   OmnitronCreateOrderDto, 
+                                   OmnitronOrderDto,
                                    ChannelCreateOrderDto,
                                    ErrorReportDto,
-                                   OrderBatchRequestResponseDto, CancelOrderDto,
+                                   OrderBatchRequestResponseDto, 
+                                   CancelOrderDto,
                                    ChannelUpdateOrderItemDto)
 from channel_app.core.settings import OmnitronIntegration, ChannelIntegration
 from channel_app.omnitron.batch_request import ClientBatchRequest
-from channel_app.omnitron.constants import ContentType
+from channel_app.omnitron.constants import (BatchRequestStatus, ContentType, 
+                                            FailedReasonType)
 from channel_app.omnitron.exceptions import (CityException,
                                              TownshipException,
                                              DistrictException,
@@ -35,21 +44,21 @@ class OrderService(object):
             order_batch_objects = []
             while True:
                 try:
-                    channel_create_order, report, _ = next(get_orders)
+                    channel_create_order, report_list, _ = next(get_orders)
                 except StopIteration:
                     break
 
                 # tips
                 channel_create_order: ChannelCreateOrderDto
-                report: ErrorReportDto
-
-                if report and (is_success_log or not report.is_ok):
-                    report.error_code = \
-                        f"{omnitron_integration.batch_request.local_batch_id}" \
-                        f"_GetOrders_{channel_create_order.order.number}"
-                    omnitron_integration.do_action(
-                        key='create_error_report',
-                        objects=report)
+                report_list: List[ErrorReportDto]
+                for report in report_list:
+                    if is_success_log or not report.is_ok:
+                        report.error_code = \
+                            f"{omnitron_integration.batch_request.local_batch_id}" \
+                            f"-Channel-GetOrders_{channel_create_order.order.number}"
+                        omnitron_integration.do_action(
+                            key='create_error_report',
+                            objects=report)
 
                 order = self.create_order(omnitron_integration=omnitron_integration,
                                           channel_order=channel_create_order)
@@ -57,10 +66,15 @@ class OrderService(object):
                     order_batch_objects.extend(omnitron_integration.batch_request.objects)
 
             omnitron_integration.batch_request.objects = order_batch_objects
-
-            self.batch_service(settings.OMNITRON_CHANNEL_ID).to_done(
-                batch_request=omnitron_integration.batch_request
-            )
+            try:
+                self.batch_service(settings.OMNITRON_CHANNEL_ID).to_done(
+                    batch_request=omnitron_integration.batch_request
+                )
+            except requests_exceptions.HTTPError as exc:
+                if exc.response.status_code == 406 and "batch_request_status_100_1" in exc.response.text:
+                    pass
+                else:
+                    raise exc
 
     def create_order(self, omnitron_integration: OmnitronIntegration,
                      channel_order: ChannelCreateOrderDto
@@ -144,21 +158,21 @@ class OrderService(object):
             order_batch_objects = []
             while True:
                 try:
-                    channel_update_order, report, _ = next(get_updated_orders)
+                    channel_update_order, report_list, _ = next(get_updated_orders)
                 except StopIteration:
                     break
 
                 # tips
                 channel_update_order: ChannelUpdateOrderItemDto
-                report: ErrorReportDto
-
-                if report and (is_success_log or not report.is_ok):
-                    report.error_code = \
-                        f"{omnitron_integration.batch_request.local_batch_id}" \
-                        f"_GetUpdatedOrders_{channel_update_order.remote_id}"
-                    omnitron_integration.do_action(
-                        key='create_error_report',
-                        objects=report)
+                report_list: List[ErrorReportDto]
+                for report in report_list:
+                    if report and (is_success_log or not report.is_ok):
+                        report.error_code = \
+                            f"{omnitron_integration.batch_request.local_batch_id}" \
+                            f"_GetUpdatedOrders_{channel_update_order.remote_id}"
+                        omnitron_integration.do_action(
+                            key='create_error_report',
+                            objects=report)
 
                 omnitron_integration.do_action(
                     key='update_order_items', objects=channel_update_order)
@@ -288,3 +302,166 @@ class OrderService(object):
             return success_data
         except IndexError:
             return
+
+    def fetch_and_create_cancellation_requests(self, is_success_log=True):
+        with OmnitronIntegration(
+                content_type=ContentType.cancellation_request.value) as omnitron_integration:
+            get_cancellation_requests = ChannelIntegration().do_action(
+                key='get_cancellation_requests',
+                batch_request=omnitron_integration.batch_request)
+            get_cancellation_requests: Generator
+            while True:
+                try:
+                    cancellation_request, report_list, _ = next(get_cancellation_requests)
+                except StopIteration:
+                    break
+
+                # tips
+                cancellation_request: CancellationRequestDto
+                report_list: List[ErrorReportDto]
+                for report in report_list:
+                    if report and (is_success_log or not report.is_ok):
+                        report.error_code = \
+                            f"{omnitron_integration.batch_request.local_batch_id}" \
+                            f"-Channel-GetCancellationRequests_{cancellation_request.order_item}"                        
+                        omnitron_integration.do_action(
+                            key='create_error_report',
+                            objects=report)
+                
+                # omnitron integration do action create_cancellation_request
+                cancellation_request_response = omnitron_integration.do_action(
+                    key='create_cancellation_requests',
+                    objects=cancellation_request)
+            try:
+                self.batch_service(settings.OMNITRON_CHANNEL_ID).to_done(
+                    batch_request=omnitron_integration.batch_request
+                )
+            except requests_exceptions.HTTPError as exc:
+                if exc.response.status_code == 406 and "batch_request_status_100_1" in exc.response.text:
+                    pass
+                else:
+                    raise exc                
+                
+                            
+    
+
+    def update_cancellation_requests(self, is_success_log=True):
+        with OmnitronIntegration(
+                content_type=ContentType.cancellation_request.value) as omnitron_integration:
+            cancellation_requests = omnitron_integration.do_action(
+                key='get_cancellation_requests_update', objects={})
+            cancellation_requests: List[CancellationRequest]
+
+            if not cancellation_requests:
+                omnitron_integration.batch_request.objects = None
+                self.batch_service(omnitron_integration.channel_id).to_fail(
+                    omnitron_integration.batch_request)
+                return
+            
+            batch_request_object_list = []
+            
+            for cancellation_request in cancellation_requests:
+                remote_order_item = self.get_channel_order_item(
+                    omnitron_integration, cancellation_request.order_item)
+                remote_reason = self.get_channel_reason(
+                    omnitron_integration, cancellation_request.reason)
+                remote_cancellation_request = self.get_channel_cancellation_request(
+                    omnitron_integration, cancellation_request.id)
+                
+                channel_cancellation_request = ChannelCancellationRequestDto(
+                    cancellation_type=cancellation_request.cancellation_type,
+                    status=cancellation_request.status,
+                    order_item=remote_order_item,
+                    reason=remote_reason,
+                    description=cancellation_request.description,
+                    remote_id=remote_cancellation_request,
+                )
+                response_data, reports, data = ChannelIntegration().do_action(
+                    key='update_cancellation_request',
+                    objects=channel_cancellation_request,
+                    batch_request=omnitron_integration.batch_request,
+                    is_sync=True)
+
+                # tips
+                response_data: List[BatchRequestResponseDto]
+                reports: List[ErrorReportDto]
+                data: List[ChannelCancellationRequestDto]
+
+                if reports and (is_success_log or not reports[0].is_ok):
+                    for report in reports:
+                        omnitron_integration.do_action(
+                            key='create_error_report',
+                            objects=report)
+
+                if response_data:
+                    failed_reason_type = None
+                else:
+                    failed_reason_type = FailedReasonType.remote.value
+                
+                batch_request_object_dto = dict(
+                    pk=cancellation_request.id,
+                    version_date=cancellation_request.modified_date,
+                    content_type=ContentType.cancellation_request.value,
+                    failed_reason_type=failed_reason_type,
+                    remote_id=remote_cancellation_request)
+                
+                batch_request_object_list.append(batch_request_object_dto)
+                   
+            status = BatchRequestStatus.fail.value
+            if any([br["failed_reason_type"] is None for br in batch_request_object_list]):
+                status = BatchRequestStatus.done.value
+
+            omnitron_integration.batch_request.objects = batch_request_object_list
+            service = self.batch_service(omnitron_integration.channel_id)
+            
+            if status == BatchRequestStatus.done.value:
+                service.to_done(batch_request=omnitron_integration.batch_request)
+            else:
+                service.to_fail(batch_request=omnitron_integration.batch_request)
+
+    def get_channel_order_item(self, omnitron_integration, order_item):
+        channel_id = omnitron_integration.channel_id
+        end_point = ChannelIntegrationActionEndpoint(
+            channel_id=channel_id)
+        params = {
+            "channel": channel_id,
+            "content_type_name": ContentType.order_item.value,
+            "object_id": order_item
+        }
+        integration_action = end_point.list(params=params)
+        if not integration_action:
+            return Exception("Order item remote id not found: {}".format(order_item))
+        if len(integration_action) > 1:
+            return Exception("Multiple order item remote id found: {}".format(order_item))
+        return integration_action[0].remote_id
+    
+    def get_channel_reason(self, omnitron_integration, omnitron_reason):
+        configuration = omnitron_integration.channel.conf
+        # configuration icinde yer alan reason_mapping anahtari bir json objesi,
+        # key channel_reason value omnitron_reason olan bir dict objesinden
+        # channel_reason'u döndürür
+        for channel_reason, omnitron_reason in configuration.get("reason_mapping", {}):
+            if omnitron_reason == omnitron_reason:
+                return channel_reason
+        
+        return "10"
+    
+    def get_channel_cancellation_request(self, omnitron_integration, 
+                                   omnitron_cancel_request_pk):
+        channel_id = omnitron_integration.channel_id
+        end_point = ChannelIntegrationActionEndpoint(
+            channel_id=channel_id)
+        params = {
+            "channel": channel_id,
+            "content_type_name": ContentType.cancellation_request.value,
+            "object_id": omnitron_cancel_request_pk
+        }
+        integration_action = end_point.list(params=params)
+        if not integration_action:
+            return Exception("Cancellation request remote id not found: {}".format(
+                omnitron_cancel_request_pk))
+        if len(integration_action) > 1:
+            return Exception("Multiple cancellation request remote id found: {}".format(
+                omnitron_cancel_request_pk))
+        return integration_action[0].remote_id
+

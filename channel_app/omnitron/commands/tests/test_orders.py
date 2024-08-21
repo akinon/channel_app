@@ -2,16 +2,29 @@ from dataclasses import asdict
 from unittest.mock import MagicMock, patch
 from omnisdk.base_client import BaseClient
 from omnisdk.omnitron.endpoints import (
-    ChannelOrderEndpoint, 
     ChannelCargoEndpoint, 
     ChannelCustomerEndpoint,
-)
-from channel_app.core.data import CustomerDto, OrderBatchRequestResponseDto
+    ChannelOrderEndpoint,
+    ChannelOrderItemEndpoint,
+    ChannelCancellationRequestEndpoint,
+    ChannelBatchRequestEndpoint)
+from omnisdk.omnitron.models import CancellationRequest
+
+from channel_app.core.data import CancellationRequestDto, CustomerDto, OrderBatchRequestResponseDto
 from channel_app.core.tests import BaseTestCaseMixin
 from channel_app.omnitron.commands.orders.cargo_companies import GetCargoCompany
 from channel_app.omnitron.commands.orders.customers import GetOrCreateCustomer
-from channel_app.omnitron.commands.orders.orders import ProcessOrderBatchRequests
-from channel_app.omnitron.constants import BatchRequestStatus, CustomerIdentifierField
+from channel_app.omnitron.commands.orders.orders import (
+    CreateCancellationRequest,
+    GetCancellationRequestUpdates, 
+    GetOrderItems, 
+    GetOrderItemsWithOrder, 
+    ProcessOrderBatchRequests,
+    ChannelIntegrationActionEndpoint)
+from channel_app.omnitron.constants import (
+    BatchRequestStatus,
+    CancellationType, 
+    CustomerIdentifierField)
 
 
 class TestProcessOrderBatchRequests(BaseTestCaseMixin):
@@ -389,4 +402,191 @@ class TestGetCargoCompany(BaseTestCaseMixin):
                 cargo_company.erp_code, 
                 self.channel_cargo_endpoint_response_data['erp_code']
             )
-            
+        
+
+class TestGetOrderItems(BaseTestCaseMixin):
+    """
+    Test case for GetOrderItems
+    run: python -m unittest channel_app.omnitron.commands.tests.test_orders.TestGetOrderItems
+    """
+    def setUp(self) -> None:
+        self.instance = GetOrderItems(
+            integration=self.mock_integration,
+        )
+        self.order = MagicMock(
+            pk=1,
+        )
+        self.order_items = [
+            MagicMock(
+                pk=7,
+                order=1,
+                content_type='orderitem'
+            ),
+            MagicMock(
+                pk=8,
+                order=1,
+                content_type='orderitem'
+            )
+        ]
+        self.instance.objects = self.order
+
+    @patch.object(GetOrderItems, 'get_order_items')
+    def test_get_data(self, mock_get_order_items):
+        mock_get_order_items.return_value = self.order_items
+        order_items = self.instance.get_data()
+        
+        self.assertEqual(len(order_items), 2)
+
+        for order_item in order_items:
+            self.assertEqual(order_item.order, self.order.pk)
+            self.assertEqual(order_item.content_type, 'orderitem')
+
+    def test_get_order_items(self):
+        response = MagicMock()
+        response.list.return_value = self.order_items
+
+        with patch.object(
+            ChannelOrderItemEndpoint,
+            '__new__',
+            return_value=response
+        ):
+            order_items = self.instance.get_order_items(self.order)
+            self.assertEqual(len(order_items), 2)
+
+            for order_item in order_items:
+                self.assertEqual(order_item.order, self.order.pk)
+                self.assertEqual(order_item.content_type, 'orderitem')
+
+
+class TestGetOrderItemsWithOrder(BaseTestCaseMixin):
+    """
+    Test case for GetOrderItems
+    run: python -m unittest channel_app.omnitron.commands.tests.test_orders.TestGetOrderItemsWithOrder
+    """
+    def setUp(self) -> None:
+        self.instance = GetOrderItemsWithOrder(
+            integration=self.mock_integration,
+        )
+        self.orders = [
+            MagicMock(
+                pk=1,
+                orderitem_set=[],
+            ),
+        ]
+        self.order_items = [
+            MagicMock(
+                pk=7,
+                order=1,
+                content_type='orderitem'
+            ),
+            MagicMock(
+                pk=8,
+                order=1,
+                content_type='orderitem'
+            ),
+        ]
+        self.instance.objects = self.orders
+
+    @patch.object(GetOrderItemsWithOrder, 'get_order_items')
+    def test_get_data(self, mock_get_order_items):
+        mock_get_order_items.return_value = self.order_items
+        orders = self.instance.get_data()
+
+        self.assertEqual(len(orders), 1)
+        self.assertEqual(len(orders[0].orderitem_set), 2)
+
+class TestGetCancellationRequestUpdates(BaseTestCaseMixin):
+    """
+    Test case for GetCancellationRequestUpdates
+    run: python -m unittest channel_app.omnitron.commands.tests.test_orders.GetCancellationRequestUpdates
+    """
+
+    def setUp(self) -> None:
+        self.instance = GetCancellationRequestUpdates(
+            integration=self.mock_integration,
+        )
+       
+        self.instance.objects = {
+            'status': 'completed',
+            'cancellation_type': 'refund'
+        }
+        self.endpoint = ChannelCancellationRequestEndpoint
+        self.cancellation_request = MagicMock(
+                pk=1,
+                status='completed',
+                cancellation_type='refund',
+                easy_return=None,
+                order_item=1,
+            )
+        return super().setUp()
+
+    @patch.object(BaseClient, 'get_instance')
+    @patch.object(ChannelCancellationRequestEndpoint, '_list')
+    @patch.object(ChannelBatchRequestEndpoint, 'update')    
+    def test_get_data(self, mock_endpoint, mock_get_instance, mock_batch_request):
+        response_data = [
+                MagicMock(
+                pk=1,
+                status='completed',
+                cancellation_type=CancellationType.refund.value,
+                easy_return=None,
+                order_item=1,
+            ),
+                MagicMock(
+                pk=2,
+                status='completed',
+                cancellation_type=CancellationType.refund.value,
+                easy_return=None,
+                order_item=2,
+            )
+        ]
+        response = MagicMock()
+        response.list.return_value = response_data
+        with patch.object(self.endpoint, '__new__', return_value=response):
+            data = self.instance.get_data()
+            self.assertEqual(len(data), 2)
+            self.assertEqual(data[0].status, self.instance.objects['status'])
+
+    @patch.object(GetCancellationRequestUpdates, 'get_cancellation_requests')
+    def test_update_cancellation_request(self, mock_get_cancellation_requests):
+        mock_get_cancellation_requests.return_value = self.cancellation_request
+        self.instance.get_cancellation_requests(self.cancellation_request)
+        self.assertEqual(self.cancellation_request.status, self.instance.objects['status'])
+        self.assertEqual(self.cancellation_request.cancellation_type, self.instance.objects['cancellation_type'])
+
+
+class TestCreateCancellationRequest(BaseTestCaseMixin):
+    """
+    Test case for CreateCancellationRequest
+    run: python -m unittest channel_app.omnitron.commands.tests.test_orders.TestCreateCancellationRequest
+    """
+
+    def setUp(self) -> None:
+        self.instance = CreateCancellationRequest(
+            integration=self.mock_integration)
+
+        self.endpoint = ChannelCancellationRequestEndpoint
+        self.instance.objects = CancellationRequestDto(
+            order_item='1',
+            reason='reason_code',
+            remote_id='2',
+            cancellation_type=CancellationType.refund.value)
+        return super().setUp()
+
+    @patch.object(BaseClient, 'get_instance')
+    @patch.object(CreateCancellationRequest, 'get_omnitron_order_item')
+    def test_get_data(self, mock_get_instance, mock_get_omnitron_order_item):
+        mock_get_omnitron_order_item.return_value = 1
+        response_data = CancellationRequest(
+                pk=1,
+                status='waiting',
+                cancellation_type='refund',
+                easy_return=None,
+                order_item=1,
+            )
+        response = MagicMock()
+        response.create.return_value = response_data
+
+        with patch.object(self.endpoint, '__new__', return_value=response):
+            data = self.instance.get_data()
+            self.assertIsInstance(data, CancellationRequest)
