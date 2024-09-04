@@ -69,7 +69,7 @@ class GetOrCreateAddress(OmnitronCommandInterface):
             "district": district_pk,
             "title": address.title and address.title[:128],
             "line": address.line[:255],
-            "postcode": address.postcode[:64],
+            "postcode": address.postcode and address.postcode[:64],
             "notes": address.notes and address.notes[:512],
             "company_name": address.company_name and address.company_name[:255],
             "tax_office": address.tax_office and address.tax_office[:64],
@@ -162,16 +162,19 @@ class GetOrCreateAddress(OmnitronCommandInterface):
             district_pk = district.pk
         return country_pk, city_pk, township_pk, district_pk
 
-    def get_mapping_object(self, code, endpoint):
+    def get_mapping_object(self, code, endpoint, extra_filters=None):
         """
         :param code: Identifier code for the City and Country on the Sales Channel. This is
             prefix with channel_id as integration_code
         :param endpoint: omnitron sdk endpoint
+        :param extra_filters: extra filters for the endpoint, dict or None
         :return: mapped objects E.g (City, Country)
         """
         integration_code = f"{self.integration.channel_id}_{code}"
         params = {"mapping__code__exact": integration_code,
                   "mapping__integration_type": INTEGRATION_TYPE}
+        if extra_filters:
+            params.update(extra_filters)
         objects = endpoint.list(params=params)
         if len(objects) != 1:
             raise IntegrationMappingException(params={"code": integration_code})
@@ -184,6 +187,10 @@ class GetOrCreateAddress(OmnitronCommandInterface):
         countries = endpoint.list(params=params)
         if len(countries) == 1:
             return countries[0]
+        params = {"name__exact": country_code, "is_active": True}
+        countries = endpoint.list(params=params)
+        if len(countries) == 1:
+            return countries[0]        
         try:
             countries = self.get_mapping_object(country_code, endpoint)
         except IntegrationMappingException as exc:
@@ -235,7 +242,8 @@ class GetOrCreateAddress(OmnitronCommandInterface):
         if len(townships) == 1:
             return townships[0]
         try:
-            townships = self.get_mapping_object(township_name, endpoint)
+            extra_filters = {"city": city.pk, "is_active": True}
+            townships = self.get_mapping_object(township_name, endpoint, extra_filters)
         except IntegrationMappingException as exc:
             raise TownshipException(
                 params={"type": ErrorType.township.value,
@@ -264,7 +272,8 @@ class GetOrCreateAddress(OmnitronCommandInterface):
         if len(districts) == 1:
             return districts[0]
         try:
-            districts = self.get_mapping_object(district_name, endpoint)
+            extra_filters = {"city": city.pk, "township": township.pk, "is_active": True}
+            districts = self.get_mapping_object(district_name, endpoint, extra_filters)
         except IntegrationMappingException as exc:
             raise DistrictException(
                 params={"type": ErrorType.district.value,
