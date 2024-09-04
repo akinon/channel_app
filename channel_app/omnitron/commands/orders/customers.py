@@ -56,7 +56,7 @@ class GetOrCreateCustomer(OmnitronCommandInterface):
                 new_customer.last_name = data.last_name
             if must_update:
                 customer = self.endpoint(channel_id=self.integration.channel_id).update(
-                    id=customer.pk, item=customer)
+                    id=customer.pk, item=new_customer)
         else:
             new_customer = Customer()
             new_customer.channel = self.integration.channel_id
