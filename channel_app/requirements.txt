@@ -6,3 +6,4 @@ omnisdk
 setuptools>=65.5.1 # not directly required, pinned by Snyk to avoid a vulnerability
 redis==5.0.1
 python-dotenv
+tornado>=6.4.1 # not directly required, pinned by Snyk to avoid a vulnerability
