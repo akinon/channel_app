@@ -107,8 +107,8 @@ class ChannelCommandInterface(CommandInterface):
             return
         name = self.__class__.__name__
         if isinstance(response, Response):
-            raw_request = f"{response.request.method}-"
-            f"{response.request.url}-"
+            raw_request = f"{response.request.method}-" \
+            f"{response.request.url}-" \
             f"{response.request.body}"
             raw_response = response.text
         else:
