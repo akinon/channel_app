@@ -246,7 +246,7 @@ class GetProductPricesFromProductStocks(OmnitronCommandInterface):
                 if isinstance(ps.product, Product):
                     product_ids.append(str(ps.product.pk))
                 else:
-                    product_ids.append(ps.product)
+                    product_ids.append(str(ps.product))
 
         prices = []
         for chunk in split_list(product_ids, self.CHUNK_SIZE):
