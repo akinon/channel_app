@@ -440,8 +440,8 @@ class OrderService(object):
         # configuration icinde yer alan reason_mapping anahtari bir json objesi,
         # key channel_reason value omnitron_reason olan bir dict objesinden
         # channel_reason'u döndürür
-        for channel_reason, omnitron_reason in configuration.get("reason_mapping", {}):
-            if omnitron_reason == omnitron_reason:
+        for channel_reason, omni_reason in configuration.get("reason_mapping", {}):
+            if omnitron_reason == omni_reason:
                 return channel_reason
         
         return "10"

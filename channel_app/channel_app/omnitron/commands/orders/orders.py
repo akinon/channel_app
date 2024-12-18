@@ -409,7 +409,7 @@ class CreateOrderCancel(OmnitronCommandInterface):
             channel_id=self.integration.channel_id)
         params = {"channel": self.integration.channel_id,
                   "content_type_name": ContentType.order.value,
-                  "remote_id": order_remote_id}
+                  "remote_id__exact": order_remote_id}
         integration_actions = end_point.list(params=params)
         if not integration_actions:
             raise Exception(
@@ -438,7 +438,7 @@ class CreateOrderCancel(OmnitronCommandInterface):
         for order_item_remote_id in cancel_items:
             params = {"channel": self.integration.channel_id,
                       "content_type_name": ContentType.order_item.value,
-                      "remote_id": order_item_remote_id,
+                      "remote_id__exact": order_item_remote_id,
                       "sort": "id"}
             integration_actions = end_point.list(params=params)
             for item in end_point.iterator:
@@ -686,7 +686,7 @@ class UpdateOrderItems(OmnitronCommandInterface):
             channel_id=self.integration.channel_id)
         params = {"channel": self.integration.channel_id,
                   "content_type_name": ContentType.order_item.value,
-                  "remote_id": order_item_remote_id}
+                  "remote_id__exact": order_item_remote_id}
         integration_actions = end_point.list(params=params)
         if not integration_actions and len(integration_actions) != 1:
             return
