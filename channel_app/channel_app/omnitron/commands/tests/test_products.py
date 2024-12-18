@@ -1,4 +1,4 @@
-from typing import List
+from requests import HTTPError
 from unittest.mock import MagicMock, patch
 from omnisdk.base_client import BaseClient
 from omnisdk.omnitron.endpoints import (
@@ -11,7 +11,8 @@ from omnisdk.omnitron.endpoints import (
     ChannelProductPriceEndpoint,
     ChannelProductStockEndpoint, 
     ChannelExtraProductStockEndpoint, 
-    ChannelExtraProductPriceEndpoint
+    ChannelExtraProductPriceEndpoint,
+    ChannelMappedProductEndpoint,
 )
 from omnisdk.omnitron.models import (
     ChannelAttributeConfig, 
@@ -471,6 +472,47 @@ class TestGetMappedProducts(BaseTestCaseMixin):
         mock_get_mapping.return_value = []
         result = self.get_mapped_products.get_mapping([])
         self.assertEqual(result, [])
+
+    @patch.object(BaseClient, 'get_instance')
+    def test_get_mapping_raise_http_error(
+        self,
+        mock_get_instance
+    ):
+        mock_response = MagicMock()
+        mock_response.status_code = 406
+        mock_response.json.return_value = {"error": "Test error"}
+
+        http_error = HTTPError(response=mock_response)
+        mock_endpoint = MagicMock()
+        mock_endpoint.retrieve.side_effect = http_error
+
+        with patch.object(
+            ChannelMappedProductEndpoint,
+            '__new__',
+            return_value=mock_endpoint
+        ):
+            test_product = Product(pk=1)
+            products = self.get_mapped_products.get_mapping([test_product])
+
+            self.assertEqual(products[0].mapped_attributes, {})
+            self.assertEqual(
+                products[0].failed_reason_type,
+                FailedReasonType.mapping.value
+            )
+            
+            self.assertEqual(len(self.get_mapped_products.failed_object_list), 1)
+            self.assertEqual(
+                self.get_mapped_products.failed_object_list[0][0],
+                test_product
+            )
+            self.assertEqual(
+                self.get_mapped_products.failed_object_list[0][1], 
+                ContentType.product.value
+            )
+            self.assertEqual(
+                self.get_mapped_products.failed_object_list[0][2],
+                "Test error"
+            )
 
 
 class TestGetMappedProductsWithOutCommit(TestGetMappedProducts):

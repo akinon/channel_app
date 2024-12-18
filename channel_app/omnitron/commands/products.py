@@ -347,11 +347,18 @@ class GetMappedProducts(OmnitronCommandInterface):
                 attributes = mapped_product_endpoint.retrieve(headers=headers,
                                                               id=product.pk)
                 product.mapped_attributes = attributes
-            except HTTPError:
+            except HTTPError as http_err:
+                if http_err.response is not None and http_err.response.status_code == 406:
+                    try:
+                        error_content = http_err.response.json()
+                        fail_message = str(error_content.get('error', error_content))
+                    except ValueError:
+                        fail_message = http_err.response.text
+
                 product.mapped_attributes = {}
                 product.failed_reason_type = FailedReasonType.mapping.value
                 self.failed_object_list.append(
-                    (product, ContentType.product.value, "MappingError"))
+                    (product, ContentType.product.value, fail_message))
                 continue
 
         return products
