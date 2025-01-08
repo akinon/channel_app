@@ -60,8 +60,8 @@ class GetOrCreateAddress(OmnitronCommandInterface):
         data = {
             "email": address.email[:254],
             "phone_number": address.phone_number[:128],
-            "first_name": address.first_name or customer.first_name[:255],
-            "last_name": address.last_name or customer.last_name[:255],
+            "first_name": (address.first_name or customer.first_name)[:255],
+            "last_name": (address.last_name or customer.last_name)[:255],
             "customer": customer.pk,
             "country": country_pk,
             "city": city_pk,
