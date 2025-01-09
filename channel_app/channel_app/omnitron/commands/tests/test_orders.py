@@ -7,9 +7,17 @@ from omnisdk.omnitron.endpoints import (
     ChannelOrderEndpoint,
     ChannelOrderItemEndpoint,
     ChannelCancellationRequestEndpoint)
-from omnisdk.omnitron.models import CancellationRequest
+from omnisdk.omnitron.models import (
+    CancellationRequest,
+    Customer
+)
 
-from channel_app.core.data import CancellationRequestDto, CustomerDto, OrderBatchRequestResponseDto
+from channel_app.core.data import (
+    AddressDto,
+    CancellationRequestDto,
+    CustomerDto,
+    OrderBatchRequestResponseDto,
+)
 from channel_app.core.tests import BaseTestCaseMixin
 from channel_app.omnitron.commands.orders.cargo_companies import GetCargoCompany
 from channel_app.omnitron.commands.orders.customers import GetOrCreateCustomer
@@ -18,11 +26,13 @@ from channel_app.omnitron.commands.orders.orders import (
     GetCancellationRequestUpdates, 
     GetOrderItems, 
     GetOrderItemsWithOrder, 
-    ProcessOrderBatchRequests)
+    ProcessOrderBatchRequests,
+)
 from channel_app.omnitron.constants import (
     BatchRequestStatus,
     CancellationType, 
-    CustomerIdentifierField)
+    CustomerIdentifierField
+)
 
 
 class TestProcessOrderBatchRequests(BaseTestCaseMixin):
@@ -334,6 +344,49 @@ class TestGetOrCreateCustomer(BaseTestCaseMixin):
 
             for key, value in self.customer_endpoint_response_data.items():
                 self.assertEqual(getattr(customer, key), value)
+
+
+class TestGetOrCreateAddress(BaseTestCaseMixin):
+    """
+    Test case for GetOrCreateAddress
+
+    run: python -m unittest channel_app.omnitron.commands.tests.test_orders.TestGetOrCreateAddress
+    """
+
+    def setUp(self) -> None:
+        self.instance = GetOrCreateAddress(
+            integration=self.mock_integration,
+        )
+        self.instance.objects = {}
+        self.instance.objects["address"]: AddressDto = AddressDto(
+            email="john.doe@akinon.com",
+            phone_number="05556667788",
+            first_name="John",
+            last_name="Doe",
+            country="1",
+            city="80",
+            line="Hemen sahil kenarı"
+        )
+        self.instance.objects["customer"]: Customer = Customer(
+            pk="1",
+            first_name="Customer John",
+            last_name="Customer Doe",
+        )
+
+
+    @patch.object(GetOrCreateAddress, 'get_location_objects')
+    def test_get_data(self, mock_get_location_objects):
+        mock_get_location_objects.return_value = (1, 80, None, None)
+        data = self.instance.get_data()
+
+        self.assertEqual(
+            data["first_name"],
+            self.instance.objects["address"].first_name
+        )
+        self.assertEqual(
+            data["last_name"],
+            self.instance.objects["address"].last_name
+        )
 
 
 class TestGetCargoCompany(BaseTestCaseMixin):
