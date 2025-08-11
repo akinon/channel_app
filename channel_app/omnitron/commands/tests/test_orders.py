@@ -570,7 +570,9 @@ class TestCreateCancellationRequest(BaseTestCaseMixin):
             order_item='1',
             reason='reason_code',
             remote_id='2',
-            cancellation_type=CancellationType.refund.value)
+            cancellation_type=CancellationType.refund.value,
+            description='description',
+        )
         return super().setUp()
 
     @patch.object(BaseClient, 'get_instance')

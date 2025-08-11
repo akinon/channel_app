@@ -199,6 +199,7 @@ class CancellationRequestDto:
     order_item: str  # remote item number
     reason: str      # reason code
     remote_id: str
+    description: str
     cancellation_type: Optional[str] = "cancel"
 
 
