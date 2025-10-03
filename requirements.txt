@@ -6,3 +6,7 @@ omnisdk
 setuptools>=65.5.1 # not directly required, pinned by Snyk to avoid a vulnerability
 redis==5.0.1
 python-dotenv
+sqlalchemy==2.0.40
+psycopg2-binary==2.9.10
+alembic==1.15.2
+boto3==1.38.5
