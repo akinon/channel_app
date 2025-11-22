@@ -43,6 +43,10 @@ class GetInsertedProducts(OmnitronCommandInterface):
 
     def get_products(self, limit: int) -> List[Product]:
         params = {"product_type": 0, "limit": limit}
+        initialized_params = getattr(self, "param_{}".format("params"), None)
+        if initialized_params:
+            params.update(initialized_params)
+
         language = getattr(self, "param_language", None)
         if language:
             products = self.endpoint(
@@ -338,7 +342,6 @@ class GetMappedProducts(OmnitronCommandInterface):
             headers = {"Accept-Language": language}
         else:
             headers = {}
-
         mapped_product_endpoint = self.endpoint(
             channel_id=self.integration.channel_id)
 
@@ -354,7 +357,7 @@ class GetMappedProducts(OmnitronCommandInterface):
                         fail_message = str(error_content.get('error', error_content))
                     except ValueError:
                         fail_message = http_err.response.text
-
+                
                 product.mapped_attributes = {}
                 product.failed_reason_type = FailedReasonType.mapping.value
                 self.failed_object_list.append(
