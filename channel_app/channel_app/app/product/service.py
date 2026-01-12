@@ -15,7 +15,8 @@ class ProductService(object):
     batch_service = ClientBatchRequest
 
     def insert_products(self, add_mapped=True, add_stock=True, add_price=True,
-                        add_categories=True, is_sync=True, is_success_log=True):
+                        add_categories=True, is_sync=True, is_success_log=True,
+                        filter_out_of_stock_products=False):
         with OmnitronIntegration(
                 content_type=ContentType.product.value) as omnitron_integration:
             products = omnitron_integration.do_action(
@@ -29,7 +30,8 @@ class ProductService(object):
 
             if add_stock:
                 products = products and omnitron_integration.do_action(
-                    key='get_product_stocks', objects=products)
+                    key='get_product_stocks', objects=products,
+                    filter_out_of_stock_products=filter_out_of_stock_products)
 
             if add_price:
                 products = products and omnitron_integration.do_action(
