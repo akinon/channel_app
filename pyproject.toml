@@ -1,0 +1,26 @@
+[project]
+name = "channel-app"
+version = "0.0.158"
+description = "Channel app for Sales Channels"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "requests==2.31.0",
+    "celery==5.3.6",
+    "sentry-sdk==1.14.0",
+    "flower==2.0.0",
+    "omnisdk",
+    "setuptools>=65.5.1",
+    "redis==5.0.1",
+    "python-dotenv",
+]
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+[tool.setuptools.packages.find]
+where = ["."]
+[tool.uv]
+dev-dependencies = [
+    "pytest==7.4.3",
+    "coverage==7.3.2",
+]

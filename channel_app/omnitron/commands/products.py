@@ -457,7 +457,38 @@ class GetProductStocks(OmnitronCommandInterface):
     def get_data(self) -> List[Product]:
         products = self.objects
         self.get_product_stock(products)
+
+        # Filter out zero stock products if flag is enabled
+        if getattr(self, 'param_filter_out_of_stock_products', False):
+            products = self._filter_out_of_stock_products(products)
+
         return products
+    
+    def _filter_out_of_stock_products(self, products: List[Product]) -> List[Product]:
+        """
+        Filters out products with zero or empty stock.
+        Products with zero stock are marked as failed and reported (Soft Filter).
+        
+        :param products: List of products with productstock attribute
+        :return: List of products with stock > 0
+        """
+        filtered_products = []
+        for product in products:
+            if getattr(product, "failed_reason_type", None):
+                continue
+
+            stock = getattr(product, 'productstock', None)
+            stock_quantity = getattr(stock, 'stock', None) if stock else None
+
+            if stock_quantity is None or stock_quantity <= 0:
+                product.failed_reason_type = FailedReasonType.channel_app.value
+                self.failed_object_list.append(
+                    (product, ContentType.product.value, "OutOfStockOnInsert")
+                )
+            else:
+                filtered_products.append(product)
+
+        return filtered_products
 
     def normalize_response(self, data, response) -> List[object]:
         object_list = []
