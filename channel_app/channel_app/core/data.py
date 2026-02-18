@@ -1,5 +1,5 @@
 import datetime
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import List, Optional
 
@@ -77,6 +77,46 @@ class ErrorReportDto:
     is_ok: bool = False
     target_content_type: Optional[str] = ''
     target_object_id: Optional[str] = ''
+
+
+@dataclass
+class OperationalEventDto:
+    event_type: str
+    level: str
+    source: str
+    message: str
+    context: Optional[dict] = field(default_factory=dict)
+    tags: Optional[dict] = field(default_factory=dict)
+    action_content_type: Optional[str] = None
+    action_object_id: Optional[int] = None
+    trace_id: Optional[str] = None
+    span_id: Optional[str] = None
+    parent_span_id: Optional[str] = None
+    raw_data: Optional[dict] = None
+
+    @classmethod
+    def from_error_report(cls, report: 'ErrorReportDto',
+                          source: str = "channel_app") -> 'OperationalEventDto':
+        level = "info" if report.is_ok else "error"
+        raw_data = None
+        if report.raw_request or report.raw_response:
+            raw_data = {
+                "raw_request": report.raw_request,
+                "raw_response": report.raw_response,
+            }
+        return cls(
+            event_type="unknown_error" if not report.is_ok else "info",
+            level=level,
+            source=source,
+            message=report.error_description or report.error_code or "",
+            context={"error_code": report.error_code,
+                     "error_description": report.error_description,
+                     "modified_date": report.modified_date},
+            tags={"action_content_type": report.action_content_type or ""},
+            action_content_type=report.action_content_type,
+            action_object_id=report.action_object_id,
+            raw_data=raw_data,
+        )
 
 
 @dataclass
