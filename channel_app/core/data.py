@@ -94,10 +94,26 @@ class OperationalEventDto:
     parent_span_id: Optional[str] = None
     raw_data: Optional[dict] = None
 
+    _CONTENT_TYPE_EVENT_TYPE_MAPPING = {
+        "product": "product_error",
+        "productprice": "product_price_error",
+        "productstock": "product_stock_error",
+        "productimage": "product_image_error",
+        "order": "order_error",
+        "orderitem": "order_error",
+        "cancellationrequest": "cancellation_request_error",
+        "categorytree": "category_error",
+        "categorynode": "category_error",
+        "batchrequest": "batch_request_error",
+    }
+
     @classmethod
     def from_error_report(cls, report: 'ErrorReportDto',
                           source: str = "channel_app") -> 'OperationalEventDto':
         level = "info" if report.is_ok else "error"
+        event_type = cls._CONTENT_TYPE_EVENT_TYPE_MAPPING.get(
+            report.action_content_type, "unknown_error"
+        )
         raw_data = None
         if report.raw_request or report.raw_response:
             raw_data = {
@@ -105,7 +121,7 @@ class OperationalEventDto:
                 "raw_response": report.raw_response,
             }
         return cls(
-            event_type="unknown_error" if not report.is_ok else "info",
+            event_type=event_type,
             level=level,
             source=source,
             message=report.error_description or report.error_code or "",
