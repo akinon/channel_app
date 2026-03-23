@@ -7,7 +7,7 @@ from typing import List, Any
 from omnisdk.omnitron.models import BatchRequest
 from requests import HTTPError, Request, Response
 
-from channel_app.core.data import ErrorReportDto
+from channel_app.core.data import ErrorReportDto, OperationalEventDto
 from channel_app.core.integration import BaseIntegration
 from channel_app.omnitron.batch_request import ClientBatchRequest
 from channel_app.omnitron.constants import BatchRequestStatus, ContentType
@@ -275,6 +275,9 @@ class OmnitronCommandInterface(CommandInterface):
             )
             self.integration.do_action(key='create_error_report',
                                        objects=report)
+            self.integration.do_action(
+                key='create_operational_event',
+                objects=OperationalEventDto.from_error_report(report))
 
     def send_error_report(self, raw_request, raw_response):
         if not self.is_batch_request:
@@ -294,6 +297,9 @@ class OmnitronCommandInterface(CommandInterface):
         self.integration.do_action(
             key='create_error_report',
             objects=report)
+        self.integration.do_action(
+            key='create_operational_event',
+            objects=OperationalEventDto.from_error_report(report))
 
     @property
     def is_batch_request(self) -> bool:

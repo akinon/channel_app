@@ -3,7 +3,8 @@ from typing import List
 from omnisdk.omnitron.models import ProductPrice, ProductStock, BatchRequest
 
 from channel_app.core import settings
-from channel_app.core.data import BatchRequestResponseDto, ErrorReportDto
+from channel_app.core.data import (BatchRequestResponseDto, ErrorReportDto,
+                                   OperationalEventDto)
 from channel_app.core.settings import OmnitronIntegration, ChannelIntegration
 from channel_app.omnitron.batch_request import ClientBatchRequest
 from channel_app.omnitron.constants import ContentType
@@ -64,6 +65,9 @@ class PriceService(object):
                     omnitron_integration.do_action(
                         key='create_error_report',
                         objects=report)
+                    omnitron_integration.do_action(
+                        key='create_operational_event',
+                        objects=OperationalEventDto.from_error_report(report))
 
             if is_sync:
                 omnitron_integration.do_action(
@@ -122,6 +126,9 @@ class PriceService(object):
                     omnitron_integration.do_action(
                         key='create_error_report',
                         objects=report)
+                    omnitron_integration.do_action(
+                        key='create_operational_event',
+                        objects=OperationalEventDto.from_error_report(report))
 
             if is_sync:
                 omnitron_integration.do_action(
@@ -178,6 +185,9 @@ class PriceService(object):
                             omnitron_integration.do_action(
                                 key='create_error_report',
                                 objects=report)
+                            omnitron_integration.do_action(
+                                key='create_operational_event',
+                                objects=OperationalEventDto.from_error_report(report))
 
                     if is_sync:
                         omnitron_integration.do_action(
@@ -239,6 +249,9 @@ class PriceService(object):
                             omnitron_integration.do_action(
                                 key='create_error_report',
                                 objects=report)
+                            omnitron_integration.do_action(
+                                key='create_operational_event',
+                                objects=OperationalEventDto.from_error_report(report))
 
                     if is_sync:
                         omnitron_integration.do_action(
@@ -277,6 +290,9 @@ class PriceService(object):
                         omnitron_integration.do_action(
                             key='create_error_report',
                             objects=report)
+                        omnitron_integration.do_action(
+                            key='create_operational_event',
+                            objects=OperationalEventDto.from_error_report(report))
 
                 if response_data:
                     omnitron_integration.batch_request = batch_request

@@ -1,7 +1,8 @@
 from typing import List
 
 from channel_app.core import settings
-from channel_app.core.data import CategoryTreeDto, ErrorReportDto, AttributeDto
+from channel_app.core.data import (CategoryTreeDto, ErrorReportDto,
+                                   OperationalEventDto, AttributeDto)
 from channel_app.core.settings import OmnitronIntegration, ChannelIntegration
 from channel_app.omnitron.constants import ContentType
 
@@ -22,6 +23,9 @@ class SetupService(object):
                 omnitron_integration.do_action(
                     key='create_error_report',
                     objects=report)
+                omnitron_integration.do_action(
+                    key='create_operational_event',
+                    objects=OperationalEventDto.from_error_report(report))
 
             omnitron_integration.do_action(
                 key='create_or_update_category_tree_and_nodes',
@@ -69,6 +73,9 @@ class SetupService(object):
                 omnitron_integration.do_action(
                     key='create_error_report',
                     objects=report)
+                omnitron_integration.do_action(
+                    key='create_operational_event',
+                    objects=OperationalEventDto.from_error_report(report))
 
             for attribute in attributes:
                 attr = omnitron_integration.do_action(
