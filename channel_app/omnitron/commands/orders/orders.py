@@ -111,6 +111,25 @@ class ProcessOrderBatchRequests(OmnitronCommandInterface, ProcessBatchRequests):
     def update_state(self, *args, **kwargs) -> BatchRequestStatus:
         return BatchRequestStatus.commit
 
+    def get_integration_actions_to_processing(self):
+        integration_actions = super().get_integration_actions_to_processing()
+        # GetOrders commits the fetched modified_date as version_date. Keep it,
+        # so changes made to the order during the run are not marked synced.
+        self.fetched_version_dates = {
+            integration_action.object_id: integration_action.version_date
+            for integration_action in integration_actions
+            if integration_action.content_type["model"] == "order"
+        }
+        return integration_actions
+
+    def create_batch_objects(self, data: list, content_type: str) -> List[dict]:
+        objects = super().create_batch_objects(data, content_type)
+        fetched_version_dates = getattr(self, "fetched_version_dates", {})
+        for obj in objects:
+            obj["version_date"] = fetched_version_dates.get(
+                obj["pk"], obj["version_date"])
+        return objects
+
     def get_remote_order_number(self, obj, integration_actions):
         for integration_action in integration_actions:
             content_type = integration_action.content_type["model"]

@@ -74,6 +74,62 @@ Statüler
     hata olduysa ya da daha satış kanalına gönderme isteğine sıra gelmeden nesnelerin tamamında
     eksik bir nokta varsa bu statü ile işlem sonlanabilir.
 
+
+OperationalEvent
+--------------------------
+
+OperationalEvent, akışlar sırasında oluşan önemli olayları Omnitron üzerinde kalıcı olarak
+kayıt altına almak için kullanılan mekanizmadır.
+BatchRequest'in operasyonel takibi sağlamasına benzer şekilde, OperationalEvent de
+akışların başarılı ya da başarısız sonuçlanma durumlarını domain bazında izlenebilir kılmaktadır.
+
+Channel App'te her akışın sonunda oluşturulan ``ErrorReportDto`` nesnesi,
+``OperationalEventDto.from_error_report()`` metodu aracılığıyla bir ``OperationalEventDto``'ya
+dönüştürülerek Omnitron'a iletilir.
+
+EventType Belirleme
+~~~~~~~~~~~~~~~~~~~~
+
+Olay tipi (``event_type``), ``ErrorReportDto`` üzerindeki ``action_content_type`` değerine göre
+otomatik olarak belirlenir:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 30
+
+   * - action_content_type
+     - event_type
+   * - ``product``
+     - ``product_error``
+   * - ``productprice``
+     - ``product_price_error``
+   * - ``productstock``
+     - ``product_stock_error``
+   * - ``productimage``
+     - ``product_image_error``
+   * - ``order``, ``orderitem``
+     - ``order_error``
+   * - ``cancellationrequest``
+     - ``cancellation_request_error``
+   * - ``categorytree``, ``categorynode``
+     - ``category_error``
+   * - ``batchrequest``
+     - ``batch_request_error``
+   * - Diğer / tanımsız
+     - ``unknown_error``
+
+Önem Seviyesi (Level) Belirleme
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Olay seviyesi (``level``), ``ErrorReportDto.is_ok`` değerine göre belirlenir:
+
+- ``is_ok=True`` → ``level: info`` (işlem başarılı)
+- ``is_ok=False`` → ``level: error`` (işlem başarısız)
+
+Bu sayede aynı ``event_type`` değeri hem başarılı hem başarısız durumları temsil edebilir;
+olayın sonucu ``level`` alanı üzerinden ayırt edilir.
+
+
 Senkron Akışlar
 -----------------------------------
 .. image:: images/sync.png

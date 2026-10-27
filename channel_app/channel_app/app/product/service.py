@@ -5,7 +5,7 @@ from omnisdk.omnitron.models import (ProductStock, Product, IntegrationAction,
 
 from channel_app.core import settings
 from channel_app.core.data import (ProductBatchRequestResponseDto,
-                                   ErrorReportDto)
+                                   ErrorReportDto, OperationalEventDto)
 from channel_app.core.settings import OmnitronIntegration, ChannelIntegration
 from channel_app.omnitron.batch_request import ClientBatchRequest
 from channel_app.omnitron.constants import ContentType
@@ -15,7 +15,8 @@ class ProductService(object):
     batch_service = ClientBatchRequest
 
     def insert_products(self, add_mapped=True, add_stock=True, add_price=True,
-                        add_categories=True, is_sync=True, is_success_log=True):
+                        add_categories=True, is_sync=True, is_success_log=True,
+                        filter_out_of_stock_products=False):
         with OmnitronIntegration(
                 content_type=ContentType.product.value) as omnitron_integration:
             products = omnitron_integration.do_action(
@@ -29,7 +30,8 @@ class ProductService(object):
 
             if add_stock:
                 products = products and omnitron_integration.do_action(
-                    key='get_product_stocks', objects=products)
+                    key='get_product_stocks', objects=products,
+                    filter_out_of_stock_products=filter_out_of_stock_products)
 
             if add_price:
                 products = products and omnitron_integration.do_action(
@@ -45,7 +47,7 @@ class ProductService(object):
                     self.batch_service(omnitron_integration.channel_id).to_fail(
                         omnitron_integration.batch_request
                     )
-                    
+
                 return
 
             products: List[Product]
@@ -74,6 +76,9 @@ class ProductService(object):
                     omnitron_integration.do_action(
                         key='create_error_report',
                         objects=report)
+                    omnitron_integration.do_action(
+                        key='create_operational_event',
+                        objects=OperationalEventDto.from_error_report(report))
 
             if is_sync:
                 omnitron_integration.do_action(
@@ -140,6 +145,9 @@ class ProductService(object):
                     omnitron_integration.do_action(
                         key='create_error_report',
                         objects=report)
+                    omnitron_integration.do_action(
+                        key='create_operational_event',
+                        objects=OperationalEventDto.from_error_report(report))
 
             if is_sync:
                 omnitron_integration.do_action(
@@ -186,6 +194,9 @@ class ProductService(object):
                     omnitron_integration.do_action(
                         key='create_error_report',
                         objects=report)
+                    omnitron_integration.do_action(
+                        key='create_operational_event',
+                        objects=OperationalEventDto.from_error_report(report))
 
             if is_sync:
                 omnitron_integration.do_action(
@@ -216,6 +227,9 @@ class ProductService(object):
                     omnitron_integration.do_action(
                         key='create_error_report',
                         objects=report)
+                    omnitron_integration.do_action(
+                        key='create_operational_event',
+                        objects=OperationalEventDto.from_error_report(report))
                 if response_data:
                     omnitron_integration.batch_request = batch_request
                     omnitron_integration.do_action(
@@ -246,6 +260,9 @@ class ProductService(object):
                     omnitron_integration.do_action(
                         key='create_error_report',
                         objects=report)
+                    omnitron_integration.do_action(
+                        key='create_operational_event',
+                        objects=OperationalEventDto.from_error_report(report))
 
                 if response_data:
                     omnitron_integration.batch_request = batch_request

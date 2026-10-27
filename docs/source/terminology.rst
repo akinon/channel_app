@@ -37,3 +37,34 @@ ayarlanabildiği teknolojidir.
 Flower
 ~~~~~~~~~~~~
 Flower, Celery için önyüz sağlayan bir yönetim aracıdır.
+
+OperationalEvent
+~~~~~~~~~~~~~~~~~
+Omnitron üzerinde operasyonel süreçlerde oluşan olayları kayıt altına alan modeldir.
+Her olay; bir seviye (``level``), olay tipi (``event_type``), kaynak (``source``), mesaj ve
+isteğe bağlı bağlam (``context``), etiket (``tags``) ve ham veri (``raw_data``) alanlarından oluşur.
+Channel App'ten gelen hata raporları, ``OperationalEventDto.from_error_report()`` metodu
+aracılığıyla bu modele dönüştürülerek Omnitron'a iletilir.
+
+EventType
+~~~~~~~~~~
+``OperationalEvent`` modelinde kaydedilen olayın hangi domain nesnesinden kaynaklandığını
+belirten sabit değer tipidir. Channel App, işlenen nesnenin ``action_content_type`` değerine
+göre otomatik olarak uygun bir ``event_type`` belirler:
+
+- ``product_error``: Ürün akışlarındaki hatalar
+- ``product_price_error``: Ürün fiyatı akışlarındaki hatalar
+- ``product_stock_error``: Ürün stoğu akışlarındaki hatalar
+- ``product_image_error``: Ürün görseli akışlarındaki hatalar
+- ``order_error``: Sipariş akışlarındaki hatalar
+- ``cancellation_request_error``: İptal talebi akışlarındaki hatalar
+- ``category_error``: Kategori yapısı akışlarındaki hatalar
+- ``batch_request_error``: Batch request işlem hataları
+- ``attribute_value_error``: Öznitelik değeri hataları
+- ``unknown_error``: Bilinmeyen veya eşleşmeyen diğer hatalar (fallback)
+
+LogLevel
+~~~~~~~~~
+``OperationalEvent`` modelinde kaydedilen olayın önem seviyesini belirten sabit değer tipidir.
+Olası değerler: ``debug``, ``info``, ``warning``, ``error``, ``critical``.
+Channel App, başarılı işlemler için ``info``, başarısız işlemler için ``error`` seviyesini kullanır.

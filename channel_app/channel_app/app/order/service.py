@@ -8,14 +8,15 @@ from omnisdk.omnitron.models import (Customer, Address, CargoCompany, Order,
 from omnisdk.omnitron.endpoints import ChannelIntegrationActionEndpoint
 
 from channel_app.core import settings
-from channel_app.core.data import (BatchRequestResponseDto, 
-                                   CancellationRequestDto, 
-                                   ChannelCancellationRequestDto, 
-                                   OmnitronCreateOrderDto, 
+from channel_app.core.data import (BatchRequestResponseDto,
+                                   CancellationRequestDto,
+                                   ChannelCancellationRequestDto,
+                                   OmnitronCreateOrderDto,
                                    OmnitronOrderDto,
                                    ChannelCreateOrderDto,
                                    ErrorReportDto,
-                                   OrderBatchRequestResponseDto, 
+                                   OperationalEventDto,
+                                   OrderBatchRequestResponseDto,
                                    CancelOrderDto,
                                    ChannelUpdateOrderItemDto)
 from channel_app.core.settings import OmnitronIntegration, ChannelIntegration
@@ -59,6 +60,9 @@ class OrderService(object):
                         omnitron_integration.do_action(
                             key='create_error_report',
                             objects=report)
+                        omnitron_integration.do_action(
+                            key='create_operational_event',
+                            objects=OperationalEventDto.from_error_report(report))
 
                 order = self.create_order(omnitron_integration=omnitron_integration,
                                           channel_order=channel_create_order)
@@ -173,6 +177,9 @@ class OrderService(object):
                         omnitron_integration.do_action(
                             key='create_error_report',
                             objects=report)
+                        omnitron_integration.do_action(
+                            key='create_operational_event',
+                            objects=OperationalEventDto.from_error_report(report))
 
                 omnitron_integration.do_action(
                     key='update_order_items', objects=channel_update_order)
@@ -227,6 +234,9 @@ class OrderService(object):
                     omnitron_integration.do_action(
                         key='create_error_report',
                         objects=report)
+                    omnitron_integration.do_action(
+                        key='create_operational_event',
+                        objects=OperationalEventDto.from_error_report(report))
 
             if is_sync:
                 omnitron_integration.do_action(
@@ -258,6 +268,9 @@ class OrderService(object):
                     omnitron_integration.do_action(
                         key='create_error_report',
                         objects=report)
+                    omnitron_integration.do_action(
+                        key='create_operational_event',
+                        objects=OperationalEventDto.from_error_report(report))
 
                 if response_data:
                     omnitron_integration.batch_request = batch_request_data
@@ -288,6 +301,9 @@ class OrderService(object):
                     omnitron_integration.do_action(
                         key='create_error_report',
                         objects=report)
+                    omnitron_integration.do_action(
+                        key='create_operational_event',
+                        objects=OperationalEventDto.from_error_report(report))
 
                 self.create_cancel(omnitron_integration=omnitron_integration,
                                    cancel_order_dto=cancel_order_dto)
@@ -323,10 +339,13 @@ class OrderService(object):
                     if report and (is_success_log or not report.is_ok):
                         report.error_code = \
                             f"{omnitron_integration.batch_request.local_batch_id}" \
-                            f"-Channel-GetCancellationRequests_{cancellation_request.order_item}"                        
+                            f"-Channel-GetCancellationRequests_{cancellation_request.order_item}"
                         omnitron_integration.do_action(
                             key='create_error_report',
                             objects=report)
+                        omnitron_integration.do_action(
+                            key='create_operational_event',
+                            objects=OperationalEventDto.from_error_report(report))
                 
                 # omnitron integration do action create_cancellation_request
                 cancellation_request_response = omnitron_integration.do_action(
@@ -392,6 +411,9 @@ class OrderService(object):
                         omnitron_integration.do_action(
                             key='create_error_report',
                             objects=report)
+                        omnitron_integration.do_action(
+                            key='create_operational_event',
+                            objects=OperationalEventDto.from_error_report(report))
 
                 if response_data:
                     failed_reason_type = None

@@ -1,4 +1,4 @@
-image: python:3.8.10
+image: python:3.11.9
 
 pipelines:
   pull-requests:
@@ -12,3 +12,19 @@ pipelines:
             - make install && make install-dev
             - make test
             - make coverage
+  tags:
+    'v*':
+      - step:
+          name: Test and publish to PyPI
+          caches:
+            - pip
+          script:
+            - python -m pip install --upgrade pip
+            - make install && make install-dev
+            - make test
+            - pip install setuptools==80.9.0 wheel==0.45.1 twine==6.1.0
+            - python setup.py sdist bdist_wheel
+            - twine check dist/*
+            - export TWINE_USERNAME=__token__
+            - export TWINE_PASSWORD=$PYPI_TOKEN
+            - twine upload --skip-existing dist/*

@@ -1,5 +1,5 @@
-from requests import HTTPError
 from unittest.mock import MagicMock, patch
+from requests import HTTPError
 from omnisdk.base_client import BaseClient
 from omnisdk.omnitron.endpoints import (
     ChannelBatchRequestEndpoint,
@@ -472,7 +472,7 @@ class TestGetMappedProducts(BaseTestCaseMixin):
         mock_get_mapping.return_value = []
         result = self.get_mapped_products.get_mapping([])
         self.assertEqual(result, [])
-
+    
     @patch.object(BaseClient, 'get_instance')
     def test_get_mapping_raise_http_error(
         self,

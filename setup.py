@@ -5,14 +5,14 @@ with open("README.md") as f:
 
 setup(
     name="channel_app",
-    version="0.0.155",
+    version="0.0.161",
     packages=find_packages(),
     url="https://github.com/akinon/channel_app",
     description="Channel app for Sales Channels",
     long_description=long_description,
     long_description_content_type="text/markdown",
     author="akinonteam",
-    python_requires=">=3.5",
+    python_requires=">=3.10",
     # We should pin the below to work with all the way from py27 to upto py39
     install_requires=["requests"],
     classifiers=[

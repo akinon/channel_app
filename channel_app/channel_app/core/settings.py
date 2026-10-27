@@ -9,7 +9,9 @@ OMNITRON_CHANNEL_ID = os.getenv("OMNITRON_CHANNEL_ID")
 OMNITRON_USER = os.getenv("OMNITRON_USERNAME")
 OMNITRON_PASSWORD = os.getenv("OMNITRON_PASSWORD")
 MAIN_APP_URL = os.getenv("MAIN_APP_URL")
-OMNITRON_URL = f"https://{MAIN_APP_URL}/"
+OMNITRON_URL = os.getenv("OMNITRON_URL") or f"https://{MAIN_APP_URL}/"
+if not OMNITRON_URL.lower().startswith("https://"):
+    raise ValueError("OMNITRON_URL must start with https://")
 OMNITRON_CATALOG_ID = os.getenv("OMNITRON_CATALOG_ID")
 CACHE_DATABASE_INDEX = os.getenv("CACHE_DATABASE_INDEX")
 CACHE_HOST = os.getenv("CACHE_HOST")

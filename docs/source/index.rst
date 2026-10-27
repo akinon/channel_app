@@ -24,7 +24,7 @@ gibi kullanır hale gelebilirler.
 --------------------------------
 Teknolojiler ve Kütüphaneler
 --------------------------------
-1. Python 3.8
+1. Python 3.10
 2. Celery 5
 3. Flower
 4. Sentry

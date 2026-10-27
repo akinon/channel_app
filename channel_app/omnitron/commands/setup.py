@@ -182,6 +182,18 @@ class CreateOrUpdateCategoryAttributes(OmnitronCommandInterface):
     """
     Create Attribute related entries on the Omnitron using the
     attribute data created from a CategoryDto object.
+
+    MarketPlaceAttributeValue is always created globally (once per unique
+    attribute + value pair).
+
+    MarketPlaceAttributeValueConfig is created only when the channel
+    returns different value sets per category.  After values are created,
+    the existing global value set is compared with this category's values.
+    If they differ, ValueConfig records are written to bind the correct
+    subset to this category's attribute set.
+
+    MarketPlaceAttributeConfig (is_required, is_variant, is_custom) is
+    always created per category since these flags genuinely vary.
     """
     integration_action_endpoint = ChannelIntegrationActionEndpoint
 
@@ -204,12 +216,13 @@ class CreateOrUpdateCategoryAttributes(OmnitronCommandInterface):
                      "object_id": integration_action.object_id,
                      "content_type": ContentType.category_node.value})
 
+        last_attribute = None
         for channel_attribute in channel_category.attributes:
             attribute = self.integration.do_action(
                 key="create_or_update_channel_attribute",
                 objects={"name": channel_attribute.name,
                          "remote_id": channel_attribute.remote_id})[0]
-            schema = self.integration.do_action(
+            self.integration.do_action(
                 key="get_or_create_channel_attribute_schema",
                 objects={"name": f"{attribute.name} Schema"}
             )
@@ -222,13 +235,81 @@ class CreateOrUpdateCategoryAttributes(OmnitronCommandInterface):
                          "is_custom": channel_attribute.allow_custom_value,
                          "is_variant": channel_attribute.variant,
                          })
+
+            all_existing = self.fetch_all_attribute_values(attribute)
+            existing_map = {v.value: v for v in all_existing}
+            had_existing = bool(all_existing)
+
             for channel_attribute_value in channel_attribute.values:
-                self.create_attribute_value_and_config(
-                    attribute=attribute, attribute_set=attribute_set,
-                    channel_attribute_value=channel_attribute_value)
+                remote_id = channel_attribute_value.remote_id
+                if remote_id not in existing_map \
+                        or existing_map[remote_id].label != channel_attribute_value.name:
+                    self.integration.do_action(
+                        key="create_or_update_channel_attribute_value",
+                        objects={
+                            "attribute": attribute.pk,
+                            "label": channel_attribute_value.name,
+                            "value": channel_attribute_value.remote_id,
+                            "remote_id": channel_attribute_value.remote_id})
+
+            if had_existing:
+                all_existing = self.fetch_all_attribute_values(attribute)
+                existing_map = {v.value: v for v in all_existing}
+
+            self.create_value_configs_if_needed(
+                existing_map, attribute_set, channel_attribute)
+
+            last_attribute = attribute
 
         self.update_category_node_version_date(integration_action)
-        return [attribute]
+        return [last_attribute] if last_attribute else []
+
+    def fetch_all_attribute_values(self, attribute):
+        """Fetch all MarketPlaceAttributeValue for an attribute, paginated."""
+        endpoint = ChannelAttributeValueEndpoint(
+            channel_id=self.integration.channel_id)
+        results = endpoint.list(params={
+            "attribute": attribute.pk,
+            "page": 1,
+            "limit": 50000,
+        })
+        if not results:
+            return []
+
+        for page in endpoint.iterator:
+            if not page:
+                break
+            results.extend(page)
+
+        return results
+
+    def create_value_configs_if_needed(self, existing_map, attribute_set,
+                                       channel_attribute):
+        """Create ValueConfig when this category's values differ from the
+        global set.
+
+        If the set of values the channel returned for this category is
+        different from all known values for the attribute, value
+        availability varies per category, so we write
+        MarketPlaceAttributeValueConfig records to bind the correct values
+        to this category's attribute set.
+        """
+        if not channel_attribute.values or not existing_map:
+            return
+
+        category_remote_ids = {v.remote_id for v in channel_attribute.values}
+        all_remote_ids = set(existing_map.keys())
+
+        if category_remote_ids == all_remote_ids:
+            return
+
+        for remote_id in category_remote_ids:
+            if remote_id in existing_map:
+                self.integration.do_action(
+                    key="get_or_create_channel_attribute_value_config",
+                    objects={
+                        "attribute_value": existing_map[remote_id].pk,
+                        "attribute_set": attribute_set.id})
 
     def update_category_node_version_date(self, integration_action):
         category_node_endpoint = ChannelCategoryNodeEndpoint(
@@ -243,6 +324,8 @@ class CreateOrUpdateCategoryAttributes(OmnitronCommandInterface):
 
     def create_attribute_value_and_config(self, attribute, attribute_set,
                                           channel_attribute_value):
+        """Kept for backward compatibility with subclasses that override
+        this method.  The default send() no longer calls it."""
         attribute_value = self.integration.do_action(
             key="create_or_update_channel_attribute_value",
             objects={
@@ -270,14 +353,19 @@ class AsyncCreateOrUpdateCategoryAttributes(CreateOrUpdateCategoryAttributes):
 
     async def run_async(self):
         integration_action, channel_category = self.get_data()
+
+        if not channel_category:
+            self.update_category_node_version_date(integration_action)
+            return
+
         attribute_set_name = self.get_attribute_set_name(channel_category)
         attribute_set = self.integration.do_action(
             key="create_or_update_channel_attribute_set",
             objects={"name": attribute_set_name,
-                     "remote_id": integration_action.remote_id})
+                     "remote_id": integration_action.remote_id})[0]
         self.integration.do_action(
             key="get_or_create_channel_attribute_set_config",
-            objects={"attribute_set": attribute_set.remote_id,
+            objects={"attribute_set": attribute_set.id,
                      "object_id": integration_action.object_id,
                      "content_type": ContentType.category_node.value})
 
@@ -285,50 +373,170 @@ class AsyncCreateOrUpdateCategoryAttributes(CreateOrUpdateCategoryAttributes):
             attribute = self.integration.do_action(
                 key="create_or_update_channel_attribute",
                 objects={"name": channel_attribute.name,
-                         "remote_id": channel_attribute.remote_id})
+                         "remote_id": channel_attribute.remote_id})[0]
+            self.integration.do_action(
+                key="get_or_create_channel_attribute_schema",
+                objects={"name": f"{attribute.name} Schema"})
             self.integration.do_action(
                 key="create_or_update_channel_attribute_config",
                 objects={"attribute": attribute.pk,
-                         "attribute_set": attribute_set.remote_id,
+                         "attribute_set": attribute_set.id,
                          "attribute_remote_id": channel_attribute.remote_id,
                          "is_required": channel_attribute.required,
                          "is_custom": channel_attribute.allow_custom_value,
                          "is_variant": channel_attribute.variant,
                          })
 
-            await asyncio.gather(
-                *[self.get_or_create_attribute_value_and_config(attribute,
-                                                                attribute_set,
-                                                                channel_attribute_value)
-                  for
-                  channel_attribute_value in channel_attribute.values])
+            all_existing = self.fetch_all_attribute_values(attribute)
+            existing_map = {v.value: v for v in all_existing}
+            had_existing = bool(all_existing)
 
-        category_node_endpoint = ChannelCategoryNodeEndpoint(
-            channel_id=self.integration.channel_id)
-        category_node = category_node_endpoint.update(
-            id=integration_action.object_id,
-            item=CategoryNode())
-        self.integration_action_endpoint(
-            channel_id=self.integration.channel_id).update(
-            id=integration_action.pk,
-            item=IntegrationAction(version_date=category_node.modified_date))
+            tasks = []
+            for channel_attribute_value in channel_attribute.values:
+                remote_id = channel_attribute_value.remote_id
+                if remote_id not in existing_map \
+                        or existing_map[remote_id].label != channel_attribute_value.name:
+                    tasks.append(
+                        self.create_attribute_value_async(
+                            attribute, channel_attribute_value))
 
-    async def get_or_create_attribute_value_and_config(self, attribute,
-                                                       attribute_set,
-                                                       channel_attribute_value):
-        attribute_value = self.integration.do_action(
+            if tasks:
+                await asyncio.gather(*tasks)
+
+            if had_existing:
+                all_existing = self.fetch_all_attribute_values(attribute)
+                existing_map = {v.value: v for v in all_existing}
+
+            self.create_value_configs_if_needed(
+                existing_map, attribute_set, channel_attribute)
+
+        self.update_category_node_version_date(integration_action)
+
+    async def create_attribute_value_async(self, attribute,
+                                            channel_attribute_value):
+        self.integration.do_action(
             key="create_or_update_channel_attribute_value",
             objects={
                 "attribute": attribute.pk,
                 "label": channel_attribute_value.name,
                 "value": channel_attribute_value.remote_id,
                 "remote_id": channel_attribute_value.remote_id})
-        attribute_value_config = self.integration.do_action(
-            key="get_or_create_channel_attribute_value_config",
-            objects={
-                "attribute_value": attribute_value.pk,
-                "attribute_set": attribute_set.remote_id})
         await asyncio.sleep(0)
+
+
+class BulkCreateOrUpdateCategoryAttributes(CreateOrUpdateCategoryAttributes):
+    """Omnitron bulk endpoint kullanarak tüm attribute'ları tek request'te işler."""
+
+    MAX_ATTRIBUTES_PER_REQUEST = 200
+    MAX_VALUES_PER_ATTRIBUTE = 500
+
+    def send(self, validated_data):
+        from omnisdk.omnitron.endpoints import ChannelBulkCategoryAttributeEndpoint
+
+        integration_action, channel_category = validated_data
+        if not channel_category:
+            self.update_category_node_version_date(integration_action)
+            return [integration_action]
+
+        attribute_set_name = self.get_attribute_set_name(channel_category)
+
+        all_attr_payloads = []
+        for attr in channel_category.attributes:
+            values = [
+                {"label": v.name, "value": v.remote_id,
+                 "remote_id": v.remote_id}
+                for v in attr.values
+            ]
+            # Value'ları chunk'la (tek attribute'un value'ları limiti aşarsa)
+            value_chunks = (
+                [values[i:i + self.MAX_VALUES_PER_ATTRIBUTE]
+                 for i in range(0, len(values), self.MAX_VALUES_PER_ATTRIBUTE)]
+                if values else [[]]
+            )
+            for v_chunk in value_chunks:
+                all_attr_payloads.append({
+                    "name": attr.name,
+                    "remote_id": attr.remote_id,
+                    "is_required": attr.required,
+                    "is_variant": attr.variant,
+                    "is_custom": attr.allow_custom_value,
+                    "values": v_chunk,
+                })
+
+        endpoint = ChannelBulkCategoryAttributeEndpoint(
+            channel_id=self.integration.channel_id)
+
+        result = None
+        for i in range(0, len(all_attr_payloads),
+                       self.MAX_ATTRIBUTES_PER_REQUEST):
+            chunk = all_attr_payloads[i:i + self.MAX_ATTRIBUTES_PER_REQUEST]
+            payload = {
+                "category_node_id": integration_action.object_id,
+                "remote_id": integration_action.remote_id,
+                "attribute_set_name": attribute_set_name,
+                "attributes": chunk,
+            }
+            result = endpoint.create(item=payload)
+
+        return [result]
+
+
+class BulkCreateOrUpdateAttributes(OmnitronCommandInterface):
+    """Bulk endpoint kullanarak channel-level attribute'ları tek request'te işler."""
+
+    MAX_ATTRIBUTES_PER_REQUEST = 200
+    MAX_VALUES_PER_ATTRIBUTE = 500
+
+    def send(self, validated_data):
+        from omnisdk.omnitron.endpoints import ChannelBulkAttributeEndpoint
+
+        attributes = validated_data
+        endpoint = ChannelBulkAttributeEndpoint(
+            channel_id=self.integration.channel_id)
+
+        all_payloads = []
+        for attr in attributes:
+            values = [{"label": v.name, "value": v.remote_id,
+                       "remote_id": v.remote_id}
+                      for v in attr.values]
+            value_chunks = (
+                [values[i:i + self.MAX_VALUES_PER_ATTRIBUTE]
+                 for i in range(0, len(values), self.MAX_VALUES_PER_ATTRIBUTE)]
+                if values else [[]]
+            )
+            for chunk in value_chunks:
+                all_payloads.append({
+                    "name": attr.name,
+                    "remote_id": attr.remote_id,
+                    "values": chunk,
+                })
+
+        for i in range(0, len(all_payloads), self.MAX_ATTRIBUTES_PER_REQUEST):
+            chunk = all_payloads[i:i + self.MAX_ATTRIBUTES_PER_REQUEST]
+            endpoint.create(item={"attributes": chunk})
+
+        return attributes
+
+
+class GetLeafCategoryNodeIds(OmnitronCommandInterface):
+    """Omnitron'dan leaf (numchild=0) CategoryNode ID'lerini çeker."""
+
+    def get_data(self):
+        return
+
+    def send(self, validated_data) -> list:
+        endpoint = ChannelCategoryNodeEndpoint(
+            channel_id=self.integration.channel_id)
+        nodes = endpoint.list(params={
+            "numchild": 0,
+            "limit": 10000,
+        })
+        all_nodes = list(nodes) if nodes else []
+        for page in endpoint.iterator:
+            if not page:
+                break
+            all_nodes.extend(page)
+        return all_nodes
 
 
 class GetCategoryIds(OmnitronCommandInterface):

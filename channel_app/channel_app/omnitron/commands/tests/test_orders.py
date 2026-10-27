@@ -6,7 +6,8 @@ from omnisdk.omnitron.endpoints import (
     ChannelCustomerEndpoint,
     ChannelOrderEndpoint,
     ChannelOrderItemEndpoint,
-    ChannelCancellationRequestEndpoint)
+    ChannelCancellationRequestEndpoint,
+    ChannelBatchRequestEndpoint)
 from omnisdk.omnitron.models import (
     CancellationRequest,
     Customer
@@ -19,8 +20,10 @@ from channel_app.core.data import (
     OrderBatchRequestResponseDto,
 )
 from channel_app.core.tests import BaseTestCaseMixin
+from channel_app.omnitron.commands.orders.addresses import GetOrCreateAddress
 from channel_app.omnitron.commands.orders.cargo_companies import GetCargoCompany
 from channel_app.omnitron.commands.orders.customers import GetOrCreateCustomer
+from channel_app.omnitron.commands.batch_requests import ProcessBatchRequests
 from channel_app.omnitron.commands.orders.orders import (
     CreateCancellationRequest,
     GetCancellationRequestUpdates, 
@@ -173,7 +176,89 @@ class TestProcessOrderBatchRequests(BaseTestCaseMixin):
         data = self.instance.group_model_items_by_content_type(items_by_content)
         self.assertEqual(len(data), 1)
         self.assertEqual(len(data.get('order')), 2)
-        
+
+    @patch.object(ProcessBatchRequests, 'get_integration_actions_to_processing')
+    def test_get_integration_actions_to_processing(self, mock_get_actions):
+        self.integration_actions[0].version_date = '2026-10-14T11:54:13.260Z'
+        self.integration_actions[1].version_date = '2026-10-14T11:54:20.000Z'
+        mock_get_actions.return_value = self.integration_actions
+
+        result = self.instance.get_integration_actions_to_processing()
+
+        self.assertEqual(result, self.integration_actions)
+        self.assertEqual(self.instance.fetched_version_dates, {
+            1: '2026-10-14T11:54:13.260Z',
+            2: '2026-10-14T11:54:20.000Z',
+        })
+
+    def test_create_batch_objects_uses_fetched_version_date(self):
+        # Order 1 is modified during the run (e.g. invoice written),
+        # order 2 is not.
+        self.instance.fetched_version_dates = {
+            1: '2026-10-14T11:54:13.260Z',
+            2: '2026-10-14T11:54:20.000Z',
+        }
+        re_read_orders = [
+            MagicMock(pk=1, modified_date='2026-10-14T11:55:26.788Z',
+                      failed_reason_type=None, remote_id='1'),
+            MagicMock(pk=2, modified_date='2026-10-14T11:54:20.000Z',
+                      failed_reason_type=None, remote_id='2'),
+        ]
+
+        objects = self.instance.create_batch_objects(
+            data=re_read_orders, content_type='order')
+
+        self.assertEqual(objects[0]['version_date'],
+                         '2026-10-14T11:54:13.260Z')
+        self.assertEqual(objects[1]['version_date'],
+                         '2026-10-14T11:54:20.000Z')
+        self.assertEqual(objects[0]['remote_id'], '1')
+
+    def test_create_batch_objects_without_fetched_version_date(self):
+        order = MagicMock(pk=3, modified_date='2026-10-14T11:55:26.788Z',
+                          failed_reason_type=None, remote_id='3')
+
+        objects = self.instance.create_batch_objects(
+            data=[order], content_type='order')
+
+        self.assertEqual(objects[0]['version_date'],
+                         '2026-10-14T11:55:26.788Z')
+
+    @patch.object(ProcessOrderBatchRequests, 'update_batch_request')
+    @patch.object(ProcessOrderBatchRequests, 'get_orders')
+    @patch.object(ProcessBatchRequests, 'get_integration_actions_to_processing')
+    def test_process_item_commits_fetched_version_date(
+        self,
+        mock_get_actions,
+        mock_get_orders,
+        mock_update_batch_request
+    ):
+        self.integration_actions[0].version_date = '2026-10-14T11:54:13.260Z'
+        self.integration_actions[1].version_date = '2026-10-14T11:54:20.000Z'
+        mock_get_actions.return_value = self.integration_actions
+        mock_get_orders.return_value = {
+            1: MagicMock(pk=1, modified_date='2026-10-14T11:55:26.788Z',
+                         failed_reason_type=None),
+            2: MagicMock(pk=2, modified_date='2026-10-14T11:54:20.000Z',
+                         failed_reason_type=None),
+        }
+        self.instance.failed_object_list = []
+        channel_response = [
+            MagicMock(number='1', status='success', remote_id='r1'),
+            MagicMock(number='2', status='success', remote_id='r2'),
+        ]
+
+        self.instance.process_item(channel_response)
+
+        objects_data = mock_update_batch_request.call_args.kwargs['objects_data']
+        version_dates = {o['pk']: o['version_date'] for o in objects_data}
+        self.assertEqual(version_dates, {
+            1: '2026-10-14T11:54:13.260Z',
+            2: '2026-10-14T11:54:20.000Z',
+        })
+        remote_ids = {o['pk']: o['remote_id'] for o in objects_data}
+        self.assertEqual(remote_ids, {1: 'r1', 2: 'r2'})
+
 
 class TestGetOrCreateCustomer(BaseTestCaseMixin):
     """

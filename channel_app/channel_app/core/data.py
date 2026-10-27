@@ -1,10 +1,41 @@
 import datetime
-from dataclasses import dataclass
+import re
+from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import List, Optional
 
 from channel_app.omnitron.constants import CancellationType, ResponseStatus, \
     ChannelConfSchemaDataTypes
+
+_MASK = "***"
+_SENSITIVE_KEYS = (
+    r"api[_-]?key|apikey|access[_-]?token|refresh[_-]?token|token|secret|"
+    r"password|passwd|authorization|e[_-]?mail|phone(?:[_-]?number)?|"
+    r"mobile|gsm"
+)
+# key=value in query strings / form bodies
+_QUERY_PARAM_RE = re.compile(
+    rf"(?P<key>(?<![\w-])(?:{_SENSITIVE_KEYS}))=(?P<value>[^&\s\"']*)",
+    re.IGNORECASE)
+# "key": "value" in JSON bodies
+_JSON_FIELD_RE = re.compile(
+    rf"(?P<key>[\"'](?:{_SENSITIVE_KEYS})[\"']\s*:\s*)"
+    rf"(?:\"[^\"]*\"|'[^']*'|[^,}}\s]+)",
+    re.IGNORECASE)
+_EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
+_PHONE_RE = re.compile(r"(?<![\w.])\+?\d[\d\s().-]{8,}\d(?![\w])")
+
+
+def mask_sensitive_data(value):
+    """Masks API keys, tokens, passwords, e-mails and phone numbers."""
+    if not value:
+        return value
+    value = str(value)
+    value = _QUERY_PARAM_RE.sub(lambda m: f"{m.group('key')}={_MASK}", value)
+    value = _JSON_FIELD_RE.sub(lambda m: f'{m.group("key")}"{_MASK}"', value)
+    value = _EMAIL_RE.sub(_MASK, value)
+    value = _PHONE_RE.sub(_MASK, value)
+    return value
 
 
 @dataclass
@@ -77,6 +108,64 @@ class ErrorReportDto:
     is_ok: bool = False
     target_content_type: Optional[str] = ''
     target_object_id: Optional[str] = ''
+
+
+@dataclass
+class OperationalEventDto:
+    event_type: str
+    level: str
+    source: str
+    message: str
+    context: Optional[dict] = field(default_factory=dict)
+    tags: Optional[dict] = field(default_factory=dict)
+    action_content_type: Optional[str] = None
+    action_object_id: Optional[int] = None
+    trace_id: Optional[str] = None
+    span_id: Optional[str] = None
+    parent_span_id: Optional[str] = None
+    raw_data: Optional[dict] = None
+
+    _CONTENT_TYPE_EVENT_TYPE_MAPPING = {
+        "product": "product_error",
+        "productprice": "product_price_error",
+        "productstock": "product_stock_error",
+        "productimage": "product_image_error",
+        "order": "order_error",
+        "orderitem": "order_error",
+        "cancellationrequest": "cancellation_request_error",
+        "categorytree": "category_error",
+        "categorynode": "category_error",
+        "batchrequest": "batch_request_error",
+    }
+
+    @classmethod
+    def from_error_report(cls, report: 'ErrorReportDto',
+                          source: str = "channel_app") -> 'OperationalEventDto':
+        level = "info" if report.is_ok else "error"
+        event_type = cls._CONTENT_TYPE_EVENT_TYPE_MAPPING.get(
+            report.action_content_type, "unknown_error"
+        )
+        raw_data = None
+        # Raw payloads carry credentials and customer data, so they are
+        # attached to failed reports only and always masked.
+        if not report.is_ok and (report.raw_request or report.raw_response):
+            raw_data = {
+                "raw_request": mask_sensitive_data(report.raw_request),
+                "raw_response": mask_sensitive_data(report.raw_response),
+            }
+        return cls(
+            event_type=event_type,
+            level=level,
+            source=source,
+            message=report.error_description or report.error_code or "",
+            context={"error_code": report.error_code,
+                     "error_description": report.error_description,
+                     "modified_date": report.modified_date},
+            tags={"action_content_type": report.action_content_type or ""},
+            action_content_type=report.action_content_type,
+            action_object_id=report.action_object_id,
+            raw_data=raw_data,
+        )
 
 
 @dataclass

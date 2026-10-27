@@ -15,6 +15,19 @@ Hata Raporu
 
 |
 
+Operasyonel Olay
+~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: channel_app.omnitron.commands.operational_events.CreateOperationalEvent
+    :members:
+
+|
+
+.. autoclass:: channel_app.omnitron.commands.operational_events.GetOperationalEvents
+    :members:
+
+|
+
 Batch Request
 ~~~~~~~~~~~~~~~~
 

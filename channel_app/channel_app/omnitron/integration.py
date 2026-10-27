@@ -7,6 +7,9 @@ from channel_app.omnitron.commands.batch_requests import GetBatchRequests, \
 from channel_app.omnitron.commands.error_reports import \
     CreateAddressErrorReports, \
     CreateErrorReports
+from channel_app.omnitron.commands.operational_events import \
+    CreateOperationalEvent, \
+    GetOperationalEvents
 from channel_app.omnitron.commands.integration_actions import \
     CreateIntegrationActions, \
     GetIntegrationActionsWithObjectId, GetIntegrationActionsWithRemoteId, \
@@ -61,7 +64,8 @@ from channel_app.omnitron.commands.setup import (
     GetOrCreateChannelAttributeValueConfig,
     AsyncCreateOrUpdateCategoryAttributes, GetOrCreateChannelAttributeSchema,
     UpdateChannelConfSchema, GetChannelAttributeSetConfigs,
-    GetChannelAttributeSets)
+    GetChannelAttributeSets, BulkCreateOrUpdateCategoryAttributes,
+    BulkCreateOrUpdateAttributes, GetLeafCategoryNodeIds)
 
 
 class OmnitronIntegration(BaseIntegration):
@@ -139,7 +143,12 @@ class OmnitronIntegration(BaseIntegration):
         "get_cancellation_requests": GetCancellationRequest,
         "get_cancellation_requests_update": GetCancellationRequestUpdates,
         "create_cancellation_requests": CreateCancellationRequest,
-        "update_order_items": UpdateOrderItems
+        "update_order_items": UpdateOrderItems,
+        "create_operational_event": CreateOperationalEvent,
+        "get_operational_events": GetOperationalEvents,
+        "bulk_create_or_update_category_attributes": BulkCreateOrUpdateCategoryAttributes,
+        "bulk_create_or_update_attributes": BulkCreateOrUpdateAttributes,
+        "get_leaf_category_node_ids": GetLeafCategoryNodeIds,
         # "fetch_cancellation_plan": FetchCancellationPlan
     }
 
